@@ -1,7 +1,7 @@
 # 🔄 REPRISE PROJET — Web-radio ehRadio (ESP32-S3 N16R8)
 
 > Document de reprise rapide. En cas de nouvelle session, lire ce fichier en premier.
-> Dernière mise à jour : 5 novembre 2026.
+> Dernière mise à jour : 5 novembre 2026 (OLED, mémo Git, écrans pris en charge).
 
 ---
 
@@ -41,6 +41,16 @@ Dossier : `D:\vscode_projets\PigTeamConcept2026\webradio` — environnement Plat
 | VCC / GND | 3,3 V / GND |
 | T_IRQ | non branché |
 
+**OLED 1,3" I2C** (SH1106, 128×64, sans tactile ; `ECRAN_OLED 1`) :
+
+| OLED | ESP32-S3 |
+|---|---|
+| SDA | GPIO 4 |
+| SCL | GPIO 5 |
+| VCC / GND | 3,3 V / GND |
+
+Adresse I2C `0x3C` par défaut (certains modules : `0x3D`, réglage `SCREEN_ADDRESS` dans `options.h`). Si l'image est décalée ou brouillée : `DSP_SSD1306` à la place de `DSP_SH1106`. Pas de tactile : commande par le WebUI.
+
 **DAC PCM5102 (I2S)** :
 
 | PCM5102 | ESP32-S3 |
@@ -59,22 +69,28 @@ Le PCM5102 sort un niveau ligne : il faut une enceinte amplifiée, un ampli ou u
 
 ## 📋 Fichiers de configuration
 
-`myoptions.h` (à la racine, à côté de `platformio.ini`) :
+`myoptions.h` (à la racine, à côté de `platformio.ini`). Une ligne `#define ECRAN_OLED` choisit l'écran : `1` = OLED 1,3" I2C (SH1106), `0` = TFT ILI9341 + tactile :
 
 ```c
 #ifndef myoptions_h
 #define myoptions_h
 
-#define DSP_MODEL     DSP_ILI9341
-#define SPIA_DEFAULT                  /* SCK=12, MISO=13, MOSI=11 */
+#define ECRAN_OLED 1   /* 1 = OLED 1,3" I2C, 0 = TFT ILI9341 + tactile */
 
-#define TFT_CS        10
-#define TFT_DC         9
-#define TFT_RST        8
-
-#define TS_MODEL      TS_MODEL_XPT2046
-#define TS_SPI        'A'
-#define TS_CS         14
+#if ECRAN_OLED
+  #define DSP_MODEL     DSP_SH1106   /* si image décalée/brouillée : DSP_SSD1306 */
+  #define I2C_SDA       4
+  #define I2C_SCL       5
+#else
+  #define DSP_MODEL     DSP_ILI9341
+  #define SPIA_DEFAULT                  /* SCK=12, MISO=13, MOSI=11 */
+  #define TFT_CS        10
+  #define TFT_DC         9
+  #define TFT_RST        8
+  #define TS_MODEL      TS_MODEL_XPT2046
+  #define TS_SPI        'A'
+  #define TS_CS         14
+#endif
 
 #define I2S_DOUT      16
 #define I2S_BCLK      17
@@ -104,6 +120,7 @@ build_flags =
 lib_deps =
   ${ehradio.lib_deps}
   ${library.ili9341}
+  ${library.sh110x}
   https://github.com/PaulStoffregen/XPT2046_Touchscreen.git
 ```
 
@@ -161,17 +178,66 @@ Les adresses `https://ice.somafm.com/<chaîne>` n'ont **pas** fonctionné : util
 ## 🔮 À faire
 
 - [ ] **Tester le son** avec le PCM5102 (câblage ci-dessus, volume bas au départ). En cas de silence : ponts au dos du module, fils DIN/BCK/LCK, volume du WebUI, log série.
-- [ ] **Sauvegarde Git** : `webradio/` est « untracked » dans le dépôt parent. Probablement un `.git` imbriqué (hérité du clone d'ehRadio) :
-  1. `Test-Path webradio\.git`
-  2. `git -C webradio rev-parse HEAD` (noter la version d'ehRadio de départ)
-  3. `Set-Content webradio\.gitignore ".pio/`n.vscode/"`
-  4. `Remove-Item -Recurse -Force webradio\.git`
-  5. `git add webradio`, `git commit`, `git push`
+- [x] **Sauvegarde Git** faite (dépôt privé dédié, voir « Git — mémo »).
+- [ ] Tester l'**OLED 1,3"** : `ECRAN_OLED 1` (SH1106 d'abord, puis SSD1306 ; adresse 0x3C puis 0x3D).
 - [ ] Écouter les stations SomaFM pour voir si le « slow stream » provoque des coupures.
 - [ ] Surveiller la **RAM interne** : libre ~125 Ko au repos, ~80 Ko pendant un flux HTTPS, mais minimum de **13,5 Ko** relevé (`[Heap] Free: 80000 Min: 13576`) après avoir enchaîné les 8 stations rapidement (poignées de main TLS). Éviter de changer de station en rafale ; si un plantage apparaît, regarder d'abord de ce côté.
 - [ ] Signaler le bug du `NULL` à trip5/ehRadio (éventuellement via un fork).
 - [ ] Régler l'orientation de l'écran et du tactile si besoin (« Inverser l'écran », « Inverser tactile » dans `settings.html`).
 - [ ] **Radio de chevet** (réveil, alimentée en USB, écran plus grand) : voir « Pistes ».
+
+---
+
+## 🔧 Git — mémo
+
+**État** : dépôt **privé** sur GitHub (compte perso), basé sur un clone d'ehRadio. Deux « remotes » : `origin` = ton dépôt, `upstream` = `trip5/ehRadio` (pour récupérer ses mises à jour). `myoptions.h` et `platformio.ini` sont ignorés par le `.gitignore` d'ehRadio : ils ont été ajoutés **une fois de force** (`git add -f`), ensuite ils sont suivis normalement. `.github/` et `.roo/` ont été supprimés volontairement (workflows de trip5 inutiles chez toi). Les playlists sont dans `playlists/`.
+
+**Routine à connaître** (PowerShell, dans le dossier du projet) :
+
+| Commande | Rôle |
+|---|---|
+| `git status` | Voir ce qui a changé |
+| `git diff fichier` | Voir le détail des changements d'un fichier |
+| `git add -A` | Préparer tous les changements |
+| `git commit -m "message"` | Enregistrer en local avec un message |
+| `git push` | Envoyer sur GitHub |
+| `git pull` | Récupérer depuis GitHub (autre PC) |
+| `git log --oneline` | Historique |
+| `git restore fichier` | **Annuler** les changements non enregistrés d'un fichier (irréversible) |
+| `git clone <adresse>` | Récupérer le projet sur un nouveau poste |
+| `git fetch upstream` puis `git merge upstream/main` | Mises à jour de trip5 (conflits possibles sur `netserver.cpp`) |
+
+**Séquence habituelle après une modification** : `git status`, `git add -A`, `git commit -m "ce que j'ai changé"`, `git push`.
+
+**Pièges** :
+- Si Git refuse de commiter faute d'identité : `git config user.name "ton nom"` et `git config user.email "ton adresse"` (sans `--global`).
+- Sur un poste qui n'est pas le tien : se déconnecter ensuite du Gestionnaire d'identification Windows.
+- Les copies `.bak` ne sont pas ignorées : elles apparaissent dans `git status`.
+- Après un `git clone` sur un nouveau poste : refaire `uploadfs` puis `upload` sur la carte.
+- Avant d'essayer un nouveau réglage : `git commit` d'abord, pour pouvoir revenir (`git restore`).
+
+---
+
+## 🖥️ Écrans pris en charge (lu dans `options.h`)
+
+| Écran | Résolution |
+|---|---|
+| LCD 1602 / 2004 (caractères) | 16×2 / 20×4 |
+| Nokia 5110 | 84×48 (plus petit graphique) |
+| GC9106 | 160×80 |
+| ST7735 | 160×128, 128×128 ou 160×80 |
+| SH1106, SH1107, SSD1305, SSD1306, SSD1327, ST7920 | 128×64 |
+| ILI9225 | 220×176 |
+| GC9A01A | 240×240 rond |
+| SSD1322 | 256×64 |
+| ILI9341 (fixe), ST7789 | 320×240 |
+| ILI9488, ILI9486, ST7796 | 480×320 (plus grand) |
+
+- `DSP_WIDTH` / `DSP_HEIGHT` ajustent la résolution de certains modèles. Pour du 480×320, le ST7796 est préférable : le code traite ILI9488 et ILI9486 comme lents (playlist par pages).
+- **Luminosité** : `DSP_DIMMING_ENABLED`, `SCREEN_BRIGHTNESS`, `DIMMING_BRIGHTNESS` n'agissent que si `BRIGHTNESS_PIN` est défini.
+- **Valeurs par défaut modifiables dans `myoptions.h`** (pour qu'un ESP32 neuf démarre déjà configuré) : `TIMEZONE_NAME`, `TIMEZONE_POSIX`, `WEATHER_LAT`, `WEATHER_LON`, `DSP_LOCALE`, `WEBUI_LOCALE`. Par défaut : Canada/Atlantic et Halifax.
+- **Faute dans `options.h`** : `SNTP_1` vaut `"0.pool.ntp.or"` (il manque le « g ») ; `SNTP_2` est correct, l'heure fonctionne donc. À signaler à trip5 avec le bug du pointeur nul.
+- `#define RADIO_BROWSER_NO_SEND_CLICKS` coupe les `[RB Click]` (comptage des écoutes sur Radio-Browser).
 
 ---
 
