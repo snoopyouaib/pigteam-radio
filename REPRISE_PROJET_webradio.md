@@ -1,7 +1,7 @@
 # 🔄 REPRISE PROJET — Web-radio ehRadio (ESP32-S3 N16R8)
 
 > Document de reprise rapide. En cas de nouvelle session, lire ce fichier en premier.
-> Dernière mise à jour : 5 novembre 2026 (OLED, mémo Git, écrans pris en charge).
+> Dernière mise à jour : 5 novembre 2026 au soir (son PCM5102 validé, recherche Radio-Browser réparée, horloge 7 segments).
 
 ---
 
@@ -16,11 +16,14 @@ Dossier : `D:\vscode_projets\PigTeamConcept2026\webradio` — environnement Plat
 | Wi-Fi + WebUI (`settings.html` sans plantage) | ✅ validé (après correctif `netserver.cpp`) |
 | Fuseau Europe/Paris, langue fr_FR | ✅ validé |
 | Écran ILI9341 240x320 SPI | ✅ validé |
+| OLED 1,3" I2C SH1106 (128×64) | ✅ validé (`ECRAN_OLED 1`, du premier coup) |
 | Tactile XPT2046 (glissement = volume) | ✅ validé |
-| Connexion aux flux (4 Radio France + SomaFM) | ✅ le log montre la connexion, **sans son** |
-| **Sortie son PCM5102** | ⏳ **pas encore testée** (module attendu) |
+| Connexion aux flux (4 Radio France + SomaFM) | ✅ validé |
+| **Sortie son PCM5102** | ✅ **validé** (5 nov. soir, sur breadboard : contacts fragiles au début, puis OK) |
+| **Recherche de stations Radio-Browser** (`search.html`) | ✅ **réparée** (bibliothèque `ESPFileUpdater` corrigée, voir « Correctifs ») |
+| Horloge 7 segments (`CLOCKFONT YO_MONO`) | ⏳ ajoutée à `myoptions.h`, à juger à l'écran |
 | Luminosité réglable de l'écran | ❌ `BRIGHTNESS_PIN` non défini (LED branchée sur 3,3 V) |
-| Sauvegarde Git de `webradio/` | ❌ à faire (voir plus bas) |
+| Sauvegarde Git de `webradio/` | ✅ dépôt privé ; `myoptions.h` et `platformio.ini` à ajouter avec `git add -f` (voir « Git — mémo ») |
 
 ---
 
@@ -49,7 +52,7 @@ Dossier : `D:\vscode_projets\PigTeamConcept2026\webradio` — environnement Plat
 | SCL | GPIO 5 |
 | VCC / GND | 3,3 V / GND |
 
-Adresse I2C `0x3C` par défaut (certains modules : `0x3D`, réglage `SCREEN_ADDRESS` dans `options.h`). Si l'image est décalée ou brouillée : `DSP_SSD1306` à la place de `DSP_SH1106`. Pas de tactile : commande par le WebUI.
+**Validé** : `DSP_SH1106` + adresse `0x3C` par défaut fonctionnent sans rien changer. Pour un autre module : adresse `0x3D` possible (réglage `SCREEN_ADDRESS` dans `options.h`). Si l'image est décalée ou brouillée : `DSP_SSD1306` à la place de `DSP_SH1106`. Pas de tactile : commande par le WebUI.
 
 **DAC PCM5102 (I2S)** :
 
@@ -59,23 +62,27 @@ Adresse I2C `0x3C` par défaut (certains modules : `0x3D`, réglage `SCREEN_ADDR
 | BCK | GPIO 17 |
 | LCK | GPIO 15 |
 | VIN / GND | 3,3 V / GND |
-| Ponts au dos : SCK, FLT, DMP, FMT | GND |
-| Pont au dos : XMT | 3,3 V |
+| SCK, FLT, DMP, FMT | GND |
+| XMT (XSMT) | **3,3 V** (à la masse = son coupé) |
+
+Ponts de soudure au dos du module (si on soude au lieu de câbler) : 1 (FLT) = **L**, 2 (DEMP) = **L**, 3 (XSMT) = **H**, 4 (FMT) = **L**. Le pont 3 sur L couperait le son. Validé ici avec des fils (les ponts étaient trop petits à souder).
 
 ⚠️ N16R8 : **GPIO 26 à 37 interdits** (flash et PSRAM octale).
-Le PCM5102 sort un niveau ligne : il faut une enceinte amplifiée, un ampli ou un casque.
+Le PCM5102 sort un niveau ligne : il faut une enceinte amplifiée, un ampli ou un casque. Volume de l'enceinte bas au premier essai.
 
 ---
 
 ## 📋 Fichiers de configuration
 
-`myoptions.h` (à la racine, à côté de `platformio.ini`). Une ligne `#define ECRAN_OLED` choisit l'écran : `1` = OLED 1,3" I2C (SH1106), `0` = TFT ILI9341 + tactile :
+Les fichiers de config vivent à la racine du projet. Dernière version : zip `ehradio_fichiers_v12` (voir ci-dessous).
+
+`myoptions.h` — une ligne `#define ECRAN_OLED` choisit l'écran : `1` = OLED 1,3" I2C (SH1106), `0` = TFT ILI9341 + tactile (version de la maison) :
 
 ```c
 #ifndef myoptions_h
 #define myoptions_h
 
-#define ECRAN_OLED 1   /* 1 = OLED 1,3" I2C, 0 = TFT ILI9341 + tactile */
+#define ECRAN_OLED 0   /* 1 = OLED 1,3" I2C, 0 = TFT ILI9341 + tactile */
 
 #if ECRAN_OLED
   #define DSP_MODEL     DSP_SH1106   /* si image décalée/brouillée : DSP_SSD1306 */
@@ -97,10 +104,16 @@ Le PCM5102 sort un niveau ligne : il faut une enceinte amplifiée, un ampli ou u
 #define I2S_LRC       15
 #define VS1053_CS     255
 
+#define SEARCHRESULTS_BUFFER 32   /* tampon de la recherche Radio-Browser (PSRAM) */
+
+/* Police de l'horloge : YO_MONO = 7 segments (façon yoRadio). Autres : CHUNKY6_PX (défaut), CHUNKY6 */
+#define CLOCKFONT YO_MONO
+#define CLOCKGLOW true
+
 #endif
 ```
 
-`platformio.ini` — environnement (les sections `[ehradio]` et `[library]` sont celles du dépôt ehRadio) :
+`platformio.ini` — environnement (les sections `[ehradio]` et `[library]` sont celles du dépôt ehRadio). **`ESPFileUpdater` n'est plus dans `lib_deps` : la version corrigée est dans `lib\ESPFileUpdater\` (dans le projet, donc dans Git)** :
 
 ```ini
 [env:ehradio_s3_n16r8]
@@ -118,11 +131,20 @@ build_flags =
   ${ehradio.build_flags}
   -DBOARD_HAS_PSRAM
 lib_deps =
-  ${ehradio.lib_deps}
+  bblanchon/ArduinoJson@^7.4.3
+  adafruit/Adafruit GFX Library@^1.12.6
+  adafruit/Adafruit BusIO@^1.17.4
+  ESP32Async/ESPAsyncWebServer@^3.11.2
+  ESP32Async/AsyncTCP@^3.4.10
+  marvinroger/AsyncMqttClient@^0.9.0
+  trip5/ehDP@^1.0.0
+  jnthas/Improv WiFi Library@^0.0.4
   ${library.ili9341}
   ${library.sh110x}
   https://github.com/PaulStoffregen/XPT2046_Touchscreen.git
 ```
+
+Si ehRadio change la liste de `[ehradio].lib_deps` lors d'une mise à jour de trip5, recopier les nouvelles lignes ici (sauf `trip5/ESPFileUpdater`).
 
 ---
 
@@ -137,6 +159,7 @@ lib_deps =
    websocket.send("tzposix=CET-1CEST,M3.5.0,M10.5.0/3");
    ```
 5. **Fuseau par défaut `Canada/Atlantic`** : les coordonnées météo par défaut sont celles de Halifax. Mettre les siennes (le champ français veut la virgule : ex. `49,9229` / `1,0775` pour Dieppe).
+7. **Recherche Radio-Browser en échec** (`Chunked transfer framing invalid or truncated`, coupure vers 4090 octets) : ce n'était **ni le réseau, ni la mémoire, ni le serveur**. Avec le cœur Arduino-ESP32 3.3.x, `NetworkClientSecure::read()` renvoie -1 quand aucune donnée n'est encore arrivée, et `NetworkClient::readBytes()` prend ce -1 pour une erreur et rend la main sans attendre : la bibliothèque `ESPFileUpdater` 1.5.0 croit le flux coupé après le premier paquet TLS. **Correctif** : dans `lib\ESPFileUpdater\src\ESPFileUpdater.cpp`, fonctions `readByteWait()` (remplace `stream.read()`) et `readSome()` (remplace les 5 `stream.readBytes()`), qui attendent vraiment les données. Résultat : 125 903 octets téléchargés et vérifiés. Fausses pistes écartées : alias `all.api` (de1 aussi marche), `SEARCHRESULTS_BUFFER`, réseau du travail. À signaler à trip5 (texte de l'issue dans `ISSUE_trip5_ESPFileUpdater.md`).
 6. **SAFE MODE** au démarrage : normal après un reflash ; il disparaît après 30 s de démarrage stable (`Boot stable after 30000 ms`).
 
 ---
@@ -177,12 +200,15 @@ Les adresses `https://ice.somafm.com/<chaîne>` n'ont **pas** fonctionné : util
 
 ## 🔮 À faire
 
-- [ ] **Tester le son** avec le PCM5102 (câblage ci-dessus, volume bas au départ). En cas de silence : ponts au dos du module, fils DIN/BCK/LCK, volume du WebUI, log série.
+- [x] **Son PCM5102 validé** (5 nov. 2026).
+- [x] **Recherche Radio-Browser réparée** (voir Correctifs, n°7).
+- [ ] Juger l'horloge 7 segments (`CLOCKFONT YO_MONO`) ; sinon `CHUNKY6_PX`. Les thèmes ne changent que les couleurs ; la disposition (`layout`) a 2 choix sur 320×240 (« Default », « VaraiTamas (BoomBox) »).
+- [ ] **Boutons / encodeur rotatif** (modules OLED avec rotatif + 2 poussoirs à la maison) : `BTN_*`, `ENC_CLK/DT/SW`, libs `onebutton` et `rotaryencoder` à décommenter. Avant : `findstr /s /n /i "BTN_PREV BTN_UP" src\core\*.cpp`.
+- [ ] Envoyer l'issue à trip5 (`ISSUE_trip5_ESPFileUpdater.md`) et signaler aussi le pointeur nul (`settings.html`) et la faute `SNTP_1`.
 - [x] **Sauvegarde Git** faite (dépôt privé dédié, voir « Git — mémo »).
-- [ ] Tester l'**OLED 1,3"** : `ECRAN_OLED 1` (SH1106 d'abord, puis SSD1306 ; adresse 0x3C puis 0x3D).
+- [x] **OLED 1,3" validé** (5 nov. 2026) : fonctionne du premier coup avec `DSP_SH1106`, adresse `0x3C` par défaut, SDA = GPIO 4, SCL = GPIO 5. Aucun réglage supplémentaire.
 - [ ] Écouter les stations SomaFM pour voir si le « slow stream » provoque des coupures.
 - [ ] Surveiller la **RAM interne** : libre ~125 Ko au repos, ~80 Ko pendant un flux HTTPS, mais minimum de **13,5 Ko** relevé (`[Heap] Free: 80000 Min: 13576`) après avoir enchaîné les 8 stations rapidement (poignées de main TLS). Éviter de changer de station en rafale ; si un plantage apparaît, regarder d'abord de ce côté.
-- [ ] Signaler le bug du `NULL` à trip5/ehRadio (éventuellement via un fork).
 - [ ] Régler l'orientation de l'écran et du tactile si besoin (« Inverser l'écran », « Inverser tactile » dans `settings.html`).
 - [ ] **Radio de chevet** (réveil, alimentée en USB, écran plus grand) : voir « Pistes ».
 
@@ -242,6 +268,9 @@ Les adresses `https://ice.somafm.com/<chaîne>` n'ont **pas** fonctionné : util
 ---
 
 ## 🧭 Pistes étudiées (en pause)
+
+- **Sculpture de circuit** (style Mohit Bhoite / Eirik Brandal) : laiton Ø 1 mm commandé. Soudure : poncer, flux, fer 350–380 °C, étamer avant d'assembler, gabarit imprimé en 3D pour tenir les pièces. Jamais deux tiges nues qui se croisent sans soudure (écart 3–4 mm ou fil émaillé). Masse et 3,3 V sur des tiges séparées. Garder l'USB-C et BOOT/RESET accessibles. Valider tout sur breadboard avant. Son : PCM5102 + enceinte amplifiée pour l'instant.
+- **Module autoradio** (idée) : boîtier imprimé simple, PCM5102 → prise jack 3,5 mm vers l'entrée AUX ; prévoir convertisseur 12 V → 5 V propre et un isolateur de boucle de masse (sinon ronflement). Cartes compactes possibles : ESP32-S3-Zero, ESP32-S3-Tiny (N8R8).
 
 - **Radio de chevet** : MAX98357A (DAC + ampli I2S, enceinte 4 Ω, mêmes fils 16/17/15) ou PCM5102 + ampli. Alimentation USB 5 V / 2 A. Il faudra une broche PWM pour la luminosité (`BRIGHTNESS_PIN`, `DSP_DIMMING_ENABLED`), et vérifier si cette version d'ehRadio a un réveil ou une minuterie d'endormissement.
 - **Écran 480x320** : ehRadio gère ILI9488 et ST7796 ; contrôleur à confirmer sur le matériel.

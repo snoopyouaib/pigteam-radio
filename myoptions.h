@@ -37,14 +37,7 @@
 #define I2S_LRC       15   /* PCM5102 LCK (LRCK / WS) */
 #define VS1053_CS     255  /* 255 = VS1053 non utilise */
 
-/* Radio-Browser : l'alias all.api... pointait vers des serveurs arretes.
-   On force le serveur de1, qui repond (verifie sur api.radio-browser.info/net). */
-#define RADIO_BROWSER_SERVER       "de1.api.radio-browser.info"
-#define RADIO_BROWSER_SERVERS_URL  "https://de1.api.radio-browser.info/json/servers"
-
-/* Recherche Radio-Browser : le log montrait un telechargement coupe a ~4 Ko
-   ("Chunked transfer framing invalid or truncated"). Radio-Browser repond par
-   blocs de 32 Ko : on force le tampon de recherche a 32 Ko (valeur PSRAM). */
+/* Recherche Radio-Browser : tampon de telechargement 32 Ko (PSRAM). */
 #define SEARCHRESULTS_BUFFER 32
 
 /* Police de l'horloge : YO_MONO = 7 segments fins façon yoRadio.
