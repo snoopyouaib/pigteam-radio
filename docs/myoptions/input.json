@@ -1,0 +1,108 @@
+[ { "title": "Inputs",
+    "info": "The most basic physical control is a rotary encoder.  All functions can be accomplished with just one encoder.\nButtons may also be used. Touch is swipe and tap motions only.\n\nRegarding Deep Sleep: Wake is only possible on RTC-capable pins.\nESP32 RTC GPIOs: 0, 2, 4, 12-15, 25-27, 32-39 / ESP32-S3/C3 RTC GPIOs: 0-21.\nInputs assigned to these pins will automatically be used for Wake.\nThis includes TS_INT, ENC_CLK, ENC_DT, ENC_SW, and all BTN_." },
+  {
+    "name": "Touch Screen: XPT2046 (SPI)",
+    "define": "TS_MODEL TS_MODEL_XPT2046",
+    "pins": "TS_CS",
+    "defines": [
+      { "define": "TS_SPI", "type": "spi", "comment": "assign touchscreen to SPI Bus" }
+    ],
+    "lib_deps": "${library.xpt2046}"
+  },
+  {
+    "name": "Touch Screen: GT911 (I2C)",
+    "define": "TS_MODEL TS_MODEL_GT911",
+    "pins": [ "TS_SDA", "TS_SCL", "TS_INT", "TS_RST" ],
+    "lib_deps": "${library.tamc_gt911}"
+  },
+  {
+    "name": "Touch Screen: FT6336 (I2C)",
+    "define": "TS_MODEL TS_MODEL_FT6336",
+    "pins": [ "TS_SDA", "TS_SCL", "TS_INT", "TS_RST" ],
+    "build_src_filter": "+<libraries/FT6336_Touchscreen/*>"
+  },
+  {
+    "name": "Rotary Encoder",
+    "info": "If the encoder works in the opposite expected direction, swap CLK and DT\nA is usually CLK, B is usually DT\nKY-040 2 steps / EC11 4 steps",
+    "pins": [ "ENC_CLK", "ENC_DT", "ENC_SW" ],
+    "defines": [
+      { "define": "ENC_STEPS", "type": "enum", "options": ["1", "2", "4"], "default": "2", "optional": true, "comment": "rotary encoder steps (default 2)" },
+      { "define": "ENC_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on rotary (default true)" },
+      { "define": "ENC_SW_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": ["${library.rotaryencoder}", "${library.onebutton}"]
+  },
+  {
+    "name": "Rotary Encoder 2",
+    "info": "If the encoder works in the opposite expected direction, swap CLK and DT\nA is usually CLK, B is usually DT\nKY-040 2 steps / EC11 4 steps",
+    "pins": [ "ENC2_CLK", "ENC2_DT", "ENC2_SW" ],
+    "defines": [
+      { "define": "ENC2_STEPS", "type": "enum", "options": ["1", "2", "4"], "default": "2", "optional": true, "comment": "rotary encoder steps (default 2)" },
+      { "define": "ENC2_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on rotary (default true)" },
+      { "define": "ENC2_SW_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": ["${library.rotaryencoder}", "${library.onebutton}"]
+  },
+  {
+    "name": "Button: Play/Pause",
+    "pins": [ "BTN_PLAY" ],
+    "defines": [
+      { "define": "BTN_PLAY_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "Button: Previous Station/Track",
+    "pins": [ "BTN_PREV" ],
+    "defines": [
+      { "define": "BTN_PREV_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "Button: Next Station/Track",
+    "pins": [ "BTN_NEXT" ],
+    "defines": [
+      { "define": "BTN_NEXT_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "Button: Volume Up",
+    "pins": [ "BTN_UP" ],
+    "defines": [
+      { "define": "BTN_UP_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "Button: Volume Down",
+    "pins": [ "BTN_DOWN" ],
+    "defines": [
+      { "define": "BTN_DOWN_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "Button: Mode Switch",
+    "pins": [ "BTN_MODE" ],
+    "defines": [
+      { "define": "BTN_MODE_PULLUP", "type": "boolean", "default": true, "comment": "use internal pullup on button (default true)" }
+    ],
+    "lib_deps": "${library.onebutton}"
+  },
+  {
+    "name": "SD Offline Mode Button",
+    "info": "SD Offline Mode is normally activated by holding any defined Button or Rotary Encoder Switch at boot.\nUse this if your build does not include these or if using all 3 interferes with boot.\nIf this is defined, only 1 button can be used to boot this mode.\nUse 255 to deactivate this boot method completely.\nIf no SD Card is defined, this mode is not available.",
+    "defines": [
+      { "define": "SDOFFLINE_BTN", "type": "enum", "options": ["255", "BTN_MODE", "ENC_SW", "ENC2_SW", "BTN_PLAY", "BTN_PREV", "BTN_NEXT", "BTN_UP", "BTN_DOWN", "TS_INT"], "optional": false, "comment": "button used to activate SD Offline Mode" }
+    ]
+  },
+  {
+    "name": "Disable Deep Sleep",
+    "info": "Deep sleep will be automatically enabled or disabled according to the GPIOs used for inputs.\nThis disables it regardless.",
+    "defines": [
+      { "define": "DEEP_SLEEP_DISABLE", "type": "flag", "optional": false, "comment": "disable deep sleep" }
+    ]
+  }
+]

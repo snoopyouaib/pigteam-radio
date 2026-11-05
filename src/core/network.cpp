@@ -1,0 +1,1118 @@
+#include "options.h"
+#include <time.h>
+#include <ArduinoJson.h>
+#include <DNSServer.h>
+#include <ehDP.h>
+#include <ESPFileUpdater.h>
+#include <ESPmDNS.h>
+#include <ImprovWiFiLibrary.h>
+#include "config.h"
+#include "display.h"
+#include "logging.h"
+#include "mqtt.h"
+#include "netserver.h"
+#include "network.h"
+#include "player.h"
+#include "rtcsupport.h"
+#include "startup.h"
+#include "telnet.h"
+#include "utility.h"
+#include "../locale/dsplocale.h"
+
+#define NETWORK_TASK_STACK_BYTES (NETWORK_TASK_STACK_SIZE * 1024)
+
+MyNetwork network;
+
+TaskHandle_t syncTaskHandle;
+TaskHandle_t streamRetryTaskHandle = NULL;
+
+bool getWeather(char *wstr);
+void doSync(void * pvParameters);
+void retryStreamConnection(void * pvParameters);
+static bool onImprovCustomConnect(const char* ssid, const char* password);
+static bool shouldClearWeatherCacheOnFailure();
+
+EhDP ehdp;
+
+void ticks() {
+  if (!display.ready()) return; //waiting for SD is ready
+  static uint32_t timeSyncTicks = 0;
+  static uint16_t weatherSyncTicks = 0;
+  static uint32_t _heapTick = 0;
+  static bool divrssi;
+  timeSyncTicks++;
+  weatherSyncTicks++;
+  if (++_heapTick >= 300) { _heapTick = 0; FUNCTIONLOG("Heap", "Free: %u Min: %u", ESP.getFreeHeap(), ESP.getMinFreeHeap()); }
+  divrssi = !divrssi;
+  if (network.status == CONNECTED) {
+    if (config.store.ehdp) ehdp.loop();
+    if (network.forceTimeSync || network.forceWeather) {
+      xTaskCreatePinnedToCore(doSync, "doSync", NETWORK_TASK_STACK_BYTES, NULL, LOW_TASK_PRIORITY, &syncTaskHandle, NETWORK_CORE);
+    }
+    // check at :01s mark (fix network clock not matching system clock after Daylight Savings Time changes)
+    if (network.timeinfo.tm_sec == 1) {
+      time_t now = time(NULL);
+      struct tm localNow;
+      localtime_r(&now, &localNow);
+      if ((network.timeinfo.tm_min != localNow.tm_min) || (network.timeinfo.tm_hour != localNow.tm_hour)) {
+        timeSyncTicks = 0;
+        network.forceTimeSync = true;
+      }
+    }
+    // Time sync interval: config value is in hours, convert to seconds
+    uint32_t timeSyncInterval = (uint32_t)config.store.timesyncinterval * 3600;
+    if (timeSyncTicks >= timeSyncInterval) {
+      timeSyncTicks=0;
+      network.forceTimeSync = true;
+    }
+    // Weather sync interval: config value is in minutes, convert to seconds
+    uint16_t weatherSyncInterval = (uint16_t)config.store.weathersyncinterval * 60;
+    if (weatherSyncTicks >= weatherSyncInterval) {
+      weatherSyncTicks=0;
+      network.forceWeather = true;
+    }
+  }
+  #ifndef DSP_LCD
+    bool connectingStream = display.mode()==PLAYER && !player.isRunning() && strcmp_P(config.station.title, l10n(L10N_MSG_CONNECT)) == 0;
+    if (connectingStream) {
+      config.screensaverTicks = 0;
+      config.screensaverPlayingTicks = 0;
+    } else {
+      if (config.store.screensaverEnabled && display.mode()==PLAYER && !player.isRunning()) {
+        config.screensaverTicks++;
+        if (config.screensaverTicks > config.store.screensaverTimeout+SCREENSAVERSTARTUPDELAY) {
+          if (config.store.screensaverBlank) {
+            display.putRequest(NEWMODE, SCREENBLANK);
+          } else {
+            display.putRequest(NEWMODE, SCREENSAVER);
+          }
+        }
+      }
+      if (config.store.screensaverPlayingEnabled && display.mode()==PLAYER && player.isRunning()) {
+        config.screensaverPlayingTicks++;
+        if (config.screensaverPlayingTicks > config.store.screensaverPlayingTimeout*60+SCREENSAVERSTARTUPDELAY) {
+          if (config.store.screensaverPlayingBlank) {
+            display.putRequest(NEWMODE, SCREENBLANK);
+          } else {
+            display.putRequest(NEWMODE, SCREENSAVER);
+          }
+        }
+      }
+    }
+  #endif //#ifndef DSP_LCD
+  #if RTCSUPPORTED
+    if (config.isRTCFound()) {
+      rtc.getTime(&network.timeinfo);
+      mktime(&network.timeinfo);
+      display.putRequest(CLOCK);
+    }
+  #else
+    if (network.timeinfo.tm_year>100 || network.status == SDOFFLINE) {
+      network.timeinfo.tm_sec++;
+      mktime(&network.timeinfo);
+      display.putRequest(CLOCK);
+    }
+  #endif //#if RTCSUPPORTED
+  if (player.isRunning() && config.getMode()==PM_SDCARD) {
+    if (network.status == SDOFFLINE) player.getAudioCurrentTime();  // bypass netserver (not running in offline mode)
+    else netserver.requestOnChange(SDPOS, 0);
+  }
+  if (divrssi) {
+    if (network.status == CONNECTED) {
+      netserver.setRSSI(WiFi.RSSI());
+      netserver.requestOnChange(NRSSI, 0);
+      display.putRequest(DSPRSSI, netserver.getRSSI());
+    } else if (network.status == SDOFFLINE) {
+      display.putRequest(DSPRSSI, 0);  // no RSSI offline, but keeps the buffer bar refreshed
+    }
+    #ifdef USE_SD
+      { static uint32_t _lastCheckSD = 0;
+        if (millis() - _lastCheckSD >= 2000) {
+          _lastCheckSD = millis();
+          if (config.getMode()==PM_SDCARD && display.mode()!=SDCHANGE) player.sendCommand({PR_CHECKSD, 0});
+        }
+      }
+      #if SD_AUTOPLAY && SD_CARD_DETECT_PIN!=255
+        if (config.getMode()!=PM_SDCARD && digitalRead(SD_CARD_DETECT_PIN)==LOW)
+          config.changeMode(PM_SDCARD);
+      #endif
+    #endif
+    { static uint32_t _lastVUTonus = 0;
+      if (millis() - _lastVUTonus >= 200) {
+        _lastVUTonus = millis();
+        player.sendCommand({PR_VUTONUS, 0});
+      }
+    }
+  }
+}
+
+void retryStreamConnection(void * pvParameters) {
+  const uint8_t maxAttempts = 40;  // 40 attempts * 15 seconds = 10 minutes
+  uint8_t attemptCount = 0;
+  while (attemptCount < maxAttempts) {
+    delay(15000);  // Wait 15 seconds between attempts
+    // Check if we should still be retrying
+    if (network.lostPlaying && WiFi.status() == WL_CONNECTED && !player.isRunning()) {
+      attemptCount++;
+      SERIALLOG("Stream reconnect attempt %d/%d", attemptCount, maxAttempts);
+      player.resumeLastWebSource();
+      delay(3000);  // Give it a moment to try connecting
+      // Check if it worked
+      if (player.isRunning()) {
+        SERIALLOG("Stream reconnected successfully!");
+        network.lostPlaying = false;
+        streamRetryTaskHandle = NULL;
+        vTaskDelete(NULL);
+        return;
+      }
+    } else {
+      // Conditions changed (user pressed stop, or already playing, or WiFi lost again)
+      if (!network.lostPlaying || player.isRunning()) {
+        network.lostPlaying = false;
+      }
+      streamRetryTaskHandle = NULL;
+      vTaskDelete(NULL);
+      return;
+    }
+  }
+  // Max attempts reached - give up
+  SERIALLOG("Stream reconnection failed after 10 minutes. User intervention required.");
+  network.lostPlaying = false;
+  streamRetryTaskHandle = NULL;
+  vTaskDelete(NULL);
+}
+
+void MyNetwork::WiFiReconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+  network.beginReconnect = false;
+  player.lockOutput = false;
+  delay(100);
+  display.putRequest(NEWMODE, PLAYER);
+  if (config.getMode()==PM_SDCARD) {
+    network.status=CONNECTED;
+    display.putRequest(NEWIP, 0);
+  } else {
+    display.putRequest(NEWMODE, PLAYER);
+    if (network.lostPlaying) {
+      player.resumeLastWebSource();
+      // Launch retry task if not already running
+      if (streamRetryTaskHandle == NULL) {
+        xTaskCreatePinnedToCore(retryStreamConnection, "streamRetry", NETWORK_TASK_STACK_BYTES, NULL, NET_TASK_PRIORITY, &streamRetryTaskHandle, NETWORK_CORE);
+      }
+    }
+  }
+  #ifdef MQTT_ENABLE
+    if (config.store.mqttenable) mqtt.connect();
+  #endif
+}
+
+void MyNetwork::WiFiLostConnection(WiFiEvent_t event, WiFiEventInfo_t info) {
+  if (!network.beginReconnect) {
+    SERIALLOG("WiFiLost: %lu ms, event=%d, SSID=%s, RSSI=%d", millis(), (int)event, config.ssids[config.store.lastSSID-1].ssid, WiFi.RSSI());
+    if (config.getMode()==PM_SDCARD) {
+      display.putRequest(NEWIP, 0);
+    } else {
+      network.lostPlaying = player.isRunning();
+      if (network.lostPlaying) { player.lockOutput = true; player.sendCommand({PR_STOP, 0}); }
+      // when we're in the middle of an update, keep the UPDATING dialog active
+      if (display.mode() != UPDATING) {
+        display.putRequest(NEWMODE, LOST);
+      }
+    }
+    network.beginReconnect = true;
+    // Spawn background task to run the full scan-best + sequential fallback strategy
+    // instead of just retrying the same AP via WiFi.reconnect()
+    xTaskCreatePinnedToCore(wifiReconnectionTask, "wifiReconn", NETWORK_TASK_STACK_BYTES, NULL, NET_TASK_PRIORITY, NULL, NETWORK_CORE);
+  }
+}
+
+bool MyNetwork::wifiBegin(bool silent) {
+  uint8_t ls = (config.store.lastSSID == 0 || config.store.lastSSID > config.ssidsCount) ? 0 : config.store.lastSSID - 1;
+  uint8_t startedls = ls;
+  uint8_t errcnt = 0;
+  WiFi.mode(WIFI_STA);
+
+  if (config.store.wifiscanbest) {
+    struct MatchedNetwork {
+      uint8_t configIndex;
+      int scanIndex;
+      int32_t rssi;
+      uint8_t channel;
+      uint8_t bssid[6];
+    };
+    MatchedNetwork matches[20];
+    int matchCount = 0;
+    if (!silent) BOOTLOG("Scanning for best available network...");
+    int n = WiFi.scanNetworks();
+    if (!silent) BOOTLOG("Scan complete: %d networks found", n);
+    if (n > 0) {
+      // Find all matching networks and build sorted list
+      for (int i = 0; i < n; i++) {
+        String scannedSSID = WiFi.SSID(i);
+        if (scannedSSID.length() == 0) continue;
+        for (uint8_t j = 0; j < config.ssidsCount; j++) {
+          if (strcmp(scannedSSID.c_str(), config.ssids[j].ssid) == 0) {
+            // Found a match - add to array if there's space
+            if (matchCount < 20) {
+              matches[matchCount].configIndex = j;
+              matches[matchCount].scanIndex = i;
+              matches[matchCount].rssi = WiFi.RSSI(i);
+              matches[matchCount].channel = WiFi.channel(i);
+              uint8_t* bssid = WiFi.BSSID(i);
+              memcpy(matches[matchCount].bssid, bssid, 6);
+              matchCount++;
+            }
+            break;
+          }
+        }
+      }
+      // Sort matches by RSSI (strongest first) using bubble sort
+      for (int i = 0; i < matchCount - 1; i++) {
+        for (int j = 0; j < matchCount - i - 1; j++) {
+          if (matches[j].rssi < matches[j + 1].rssi) {
+            MatchedNetwork temp = matches[j];
+            matches[j] = matches[j + 1];
+            matches[j + 1] = temp;
+          }
+        }
+      }
+      // Log all matches
+      if (!silent && matchCount > 0) {
+        BOOTLOG("Available networks from your saved list (sorted by strength):");
+        for (int i = 0; i < matchCount; i++) {
+          BOOTLOG("  %d. %s | MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %d dBm | Ch: %d", 
+                  i+1, config.ssids[matches[i].configIndex].ssid,
+                  matches[i].bssid[0], matches[i].bssid[1], matches[i].bssid[2],
+                  matches[i].bssid[3], matches[i].bssid[4], matches[i].bssid[5],
+                  matches[i].rssi, matches[i].channel);
+        }
+      }
+    }
+    // Try each matched network in RSSI order
+    for (int attempt = 0; attempt < matchCount; attempt++) {
+      uint8_t configIdx = matches[attempt].configIndex;
+      if (!silent) {
+        BOOTLOG("Attempt %d: connecting to %s | MAC: %02X:%02X:%02X:%02X:%02X:%02X (RSSI: %d dBm)", 
+                attempt + 1, config.ssids[configIdx].ssid,
+                matches[attempt].bssid[0], matches[attempt].bssid[1], matches[attempt].bssid[2],
+                matches[attempt].bssid[3], matches[attempt].bssid[4], matches[attempt].bssid[5],
+                matches[attempt].rssi);
+        BOOTLOGX("\t");
+        display.putRequest(BOOTSTRING, configIdx);
+      }
+      WiFi.begin(config.ssids[configIdx].ssid, config.ssids[configIdx].password, 
+                 matches[attempt].channel, matches[attempt].bssid); // Connect to specific AP by BSSID
+      errcnt = 0;
+      while (WiFi.status() != WL_CONNECTED) {
+        if (!silent) SERIALLOGDOT();
+        delay(500);
+        network.loopImprov();
+        if (LED_PIN!=255 && !silent) digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        errcnt++;
+        if (errcnt > WIFI_ATTEMPTS) {
+          SERIALLOG("");
+          break;  // Failed, try next match
+        }
+      }
+      if (WiFi.status() == WL_CONNECTED) {
+        SERIALLOG("");
+        WiFi.scanDelete();
+        config.setLastSSID(configIdx + 1);
+        return true;
+      }
+    }
+
+    // All scanned matches failed
+    WiFi.scanDelete();
+    if (!silent) BOOTLOG("All scanned networks failed.");
+    return false;
+  } else {
+    // Try all configured SSIDs sequentially (original behavior)
+    while (true) {
+      if (!silent) {
+        BOOTLOG("Attempt to connect to %s", config.ssids[ls].ssid);
+        BOOTLOGX("\t");
+        display.putRequest(BOOTSTRING, ls);
+      }
+      WiFi.begin(config.ssids[ls].ssid, config.ssids[ls].password);
+      while (WiFi.status() != WL_CONNECTED) {
+        if (!silent) SERIALLOGDOT();
+        delay(500);
+        network.loopImprov();
+        if (LED_PIN!=255 && !silent) digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        errcnt++;
+        if (errcnt > WIFI_ATTEMPTS) {
+          errcnt = 0;
+          ls++;
+          if (ls > config.ssidsCount - 1) ls = 0;
+          break;
+        }
+      }
+      if (WiFi.status() != WL_CONNECTED && ls == startedls) {
+        SERIALLOG("");
+        return false;
+        break;
+      }
+      if (WiFi.status() == WL_CONNECTED) {
+        SERIALLOG("");
+        config.setLastSSID(ls + 1);
+        return true;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+void MyNetwork::ehDPinit() {
+  if (strlen(config.store.ehdpname) > 0) {
+    ehdp.setName(config.store.ehdpname);
+    #ifdef FIRMWARE_NAME
+      ehdp.setFirmware(FIRMWARE_NAME);
+    #elif defined(FIRMWARE)
+      String fw = FIRMWARE;
+      if (fw.endsWith(".bin")) fw.remove(fw.length() - 4);
+      ehdp.setFirmware(fw.c_str());
+    #endif
+  } else {
+    #ifdef FIRMWARE_NAME
+      ehdp.setName(FIRMWARE_NAME);
+    #endif
+    #ifdef FIRMWARE
+      String fw = FIRMWARE;
+      if (fw.endsWith(".bin")) fw.remove(fw.length() - 4);
+      ehdp.setFirmware(fw.c_str());
+    #endif
+  }
+  ehdp.setProject("ehRadio");
+  ehdp.setVersion(RADIOVERSION);
+  ehdp.setUIPort(80);
+  ehdp.setMaterialSymbol("0xe03e");
+  if (strlen(config.store.mdnsname) > 0) ehdp.setMdns(config.store.mdnsname);
+  if (ehdp.begin()) {
+    BOOTLOG("ehDP listening");
+  } else {
+    BOOTLOG("ehDP failed to start");
+  }
+}
+
+void wifiReconnectionTask(void * pvParameters) {
+  SERIALLOG("WiFiReconnectionTask: starting smart reconnection (scan + sequential fallback)");
+  while (network.beginReconnect && network.status != SOFT_AP) {
+    // Run the full wifiBegin strategy: scan, match against saved SSIDs, sort by RSSI,
+    // connect to strongest by BSSID, fall back to sequential trial of all saved SSIDs
+    if (network.wifiBegin(true)) {
+      // Connection established. The ARDUINO_EVENT_WIFI_STA_GOT_IP event fires,
+      // WiFiReconnected() handles display restore, stream resume, MQTT reconnect, etc.
+      SERIALLOG("WiFiReconnectionTask: reconnected successfully");
+      break;
+    }
+    // Full cycle failed — wait 5 seconds (checking periodically if we should abort)
+    // before scanning and retrying from scratch
+    SERIALLOG("WiFiReconnectionTask: no known networks available, retrying in 5s...");
+    for (int i = 0; i < 5; i++) {
+      if (!network.beginReconnect || network.status == SOFT_AP) {
+        vTaskDelete(NULL);
+        return;
+      }
+      delay(1000);
+    }
+  }
+  vTaskDelete(NULL);
+}
+
+#define DBGAP false
+
+void MyNetwork::begin() {
+  // Initialize Improv early if not already done, so it's always available via Serial
+  if (!improv) {
+    BOOTLOG("improv.begin");
+    improv = new ImprovWiFi(&Serial);
+    #if defined(CONFIG_IDF_TARGET_ESP32S3)
+      ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32_S3;
+    #elif defined(CONFIG_IDF_TARGET_ESP32C3)
+      ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32_C3;
+    #else
+      ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32;
+    #endif
+    char deviceUrl[64];
+    strlcpy(deviceUrl, "http://{LOCAL_IPV4}/", sizeof(deviceUrl));
+    improv->setDeviceInfo(chip, "ehRadio", RADIOVERSION, "ehRadio", deviceUrl);
+    improv->setCustomConnectWiFi(onImprovCustomConnect);
+  }
+  BOOTLOG("network.begin");
+
+  startup.initNetwork();
+  ctimer.detach();
+  if (config.ssidsCount == 0 || DBGAP) {
+    raiseSoftAP();
+    return;
+  }
+  if (false) {
+    // unreachable — placeholder for structure
+  } else {
+    // Regular SD (from NVS) or Web mode — Wi-Fi as normal; if fails, go to AP
+    if (!wifiBegin()) {
+      raiseSoftAP();
+      SERIALLOG("");
+      BOOTLOG("Raise SoftAP done");
+      return;
+    }
+    status = CONNECTED;
+    setWifiParams();
+  }
+  BOOTLOG("Wifi done");
+  ehDPinit();
+  if (LED_PIN!=255) digitalWrite(LED_PIN, LOW);
+  
+  #if RTCSUPPORTED
+    if (config.isRTCFound()) {
+      rtc.getTime(&network.timeinfo);
+      mktime(&network.timeinfo);
+      display.putRequest(CLOCK);
+    }
+  #endif
+  ctimer.attach(1, ticks);
+}
+
+void MyNetwork::loopImprov() {
+  if (!improv) return;
+  improv->handleSerial();
+}
+
+static Ticker improvRebootTicker;
+
+static void triggerImprovReboot() {
+  FUNCTIONLOG("REBOOT", "Improv Reboot.");
+  ESP.restart();
+}
+
+static bool onImprovCustomConnect(const char* ssid, const char* password) {
+  // Try to connect briefly to verify if credentials work before saving
+  WiFi.begin(ssid, password);
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
+    delay(500);
+    network.loopImprov();
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    // Revert to AP if we were in AP mode, or just return false to signal error to browser
+    // This will notify the user in the browser that connection failed
+    return false;
+  }
+
+  // CONNECTION SUCCESSFUL - Proceed with saving logic
+  if (utility.addSsid(ssid, password)) {
+    // Update the URL immediately before returning success to browser
+    IPAddress ip = WiFi.localIP();
+    char deviceUrl[64];
+    snprintf(deviceUrl, sizeof(deviceUrl), "http://%d.%d.%d.%d/", ip[0], ip[1], ip[2], ip[3]);
+    #if defined(CONFIG_IDF_TARGET_ESP32S3)
+      ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32_S3;
+    #elif defined(CONFIG_IDF_TARGET_ESP32C3)
+      ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32_C3;
+    #else
+    ImprovTypes::ChipFamily chip = ImprovTypes::ChipFamily::CF_ESP32;
+  #endif
+    if (network.improv) network.improv->setDeviceInfo(chip, "ehRadio", RADIOVERSION, "ehRadio", deviceUrl);
+
+    improvRebootTicker.once(3, triggerImprovReboot);
+    return true;
+  }
+  return false;
+}
+
+void MyNetwork::setWifiParams() {
+  WiFi.setSleep(false);
+  WiFi.onEvent(WiFiReconnected, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(WiFiLostConnection, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  weatherBuf=NULL;
+  #if (DSP_MODEL!=DSP_DUMMY)
+    if (weatherBuf) { free(weatherBuf); weatherBuf = nullptr; }
+    weatherBuf = (char *) malloc(sizeof(char) * WEATHER_STRING_L);
+    memset(weatherBuf, 0, WEATHER_STRING_L);
+  #endif
+  if (strlen(config.store.sntp1)>0 && strlen(config.store.sntp2)>0) {
+    configTzTime(config.store.tzposix, config.store.sntp1, config.store.sntp2);
+  } else if (strlen(config.store.sntp1)>0) {
+    configTzTime(config.store.tzposix, config.store.sntp1);
+  }
+}
+
+void MyNetwork::requestTimeSync(bool withTelnetOutput, uint8_t clientId) {
+  if (withTelnetOutput) {
+    (void)clientId;
+    if (strlen(config.store.sntp1) > 0 && strlen(config.store.sntp2) > 0)
+      configTzTime(config.store.tzposix, config.store.sntp1, config.store.sntp2);
+    else if (strlen(config.store.sntp1) > 0)
+      configTzTime(config.store.tzposix, config.store.sntp1);
+    char timeStringBuff[50];
+    strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+    FUNCTIONLOG("Time.sync", "Date Time: %s", timeStringBuff);
+    FUNCTIONLOG("Time.sync", "Time Zone Name & POSIX: %s, %s", config.store.tz_name, config.store.tzposix);
+  }
+}
+
+void rebootTime() {
+  FUNCTIONLOG("REBOOT", "Reboot time!");
+  ESP.restart();
+}
+
+void MyNetwork::raiseSoftAP() {
+  WiFi.mode(WIFI_AP);
+  #ifdef AP_PASSWORD
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+  #else
+    WiFi.softAP(AP_SSID);
+  #endif
+  dnsServer = new DNSServer();
+  dnsServer->start(53, "*", WiFi.softAPIP());
+  BOOTLOG("");
+  BOOTLOG("************************************************");
+  BOOTLOG("Running in AP/Improv mode");
+  #ifdef AP_PASSWORD
+    BOOTLOG("Connect to AP %s with password %s", AP_SSID, AP_PASSWORD);
+  #else
+    BOOTLOG("Connect to AP %s with no password", AP_SSID);
+  #endif
+  BOOTLOG("and go to http://192.168.4.1/ to configure");
+  BOOTLOG("Improv WiFi provisioning available via serial");
+  BOOTLOG("************************************************");
+  
+  status = SOFT_AP;
+  if (config.store.softapdelay>0)
+    rtimer.once(config.store.softapdelay*60, rebootTime);
+}
+
+void MyNetwork::requestWeatherSync() {
+  display.putRequest(NEWWEATHER);
+}
+
+
+void doSync(void * pvParameters) {
+  static uint8_t tsFailCnt = 0;
+  //static uint8_t wsFailCnt = 0;
+  if (network.forceTimeSync) {
+    network.forceTimeSync = false;
+    if (getLocalTime(&network.timeinfo)) {
+      tsFailCnt = 0;
+      network.forceTimeSync = false;
+      mktime(&network.timeinfo);
+      display.putRequest(CLOCK);
+      network.requestTimeSync(true);
+      #if RTCSUPPORTED
+        if (config.isRTCFound()) rtc.setTime(&network.timeinfo);
+      #endif
+    } else {
+      if (tsFailCnt<4) {
+        network.forceTimeSync = true;
+        tsFailCnt++;
+      } else {
+        network.forceTimeSync = false;
+        tsFailCnt=0;
+      }
+    }
+  }
+  if (network.weatherBuf && config.store.showweather && network.forceWeather) {
+    // Fetch weather without interrupting display (keep showing cached data)
+    network.forceWeather = false;
+    if (!getWeather(network.weatherBuf) && shouldClearWeatherCacheOnFailure()) {
+      network.buildWeatherString();
+    }
+  }
+  vTaskDelete(NULL);
+}
+
+// Helper: Download URL to temporary file using EspFileUpdater (handles chunked encoding)
+bool downloadToTempFile(const char* url) {
+  // Delete old temp file if exists
+  if (SPIFFS.exists(TMP_PATH)) {
+    SPIFFS.remove(TMP_PATH);
+  }
+  
+  ESPFileUpdater* downloader = new ESPFileUpdater(SPIFFS);
+  downloader->setUserAgent(ESPFILEUPDATER_USERAGENT);
+  downloader->setMaxSize(2048);  // Weather JSON responses are small
+  
+  ESPFileUpdater::UpdateStatus result = downloader->checkAndUpdate(
+    TMP_PATH,
+    url,
+    "",
+    ESPFILEUPDATER_VERBOSE
+  );
+  
+  delete downloader;
+  return (result == ESPFileUpdater::UPDATED);
+}
+
+// WMO Weather Code to Description (for Open-Meteo)
+const char* getWMODescription(int code) {
+  switch(code) {
+    case 0:  return l10n(L10N_MSG_W_CLEAR_SKY);
+    case 1: case 2: case 3: return l10n(L10N_MSG_W_OVERCAST);
+    case 45: case 48: return l10n(L10N_MSG_W_FOGGY);
+    case 51: case 53: case 55: return l10n(L10N_MSG_W_DRIZZLE);
+    case 56: case 57: return l10n(L10N_MSG_W_FREEZING_DRIZZLE);
+    case 61: case 63: case 65: return l10n(L10N_MSG_W_RAIN);
+    case 66: case 67: return l10n(L10N_MSG_W_FREEZING_RAIN);
+    case 71: case 73: case 75: return l10n(L10N_MSG_W_SNOW);
+    case 77: return l10n(L10N_MSG_W_SNOW_GRAINS);
+    case 80: case 81: case 82: return l10n(L10N_MSG_W_RAIN_SHOWERS);
+    case 85: case 86: return l10n(L10N_MSG_W_SNOW_SHOWERS);
+    case 95: return l10n(L10N_MSG_W_THUNDERSTORM);
+    case 96: case 99: return l10n(L10N_MSG_W_THUNDERSTORM_HAIL);
+    default: return "Unknown";
+  }
+}
+
+// Weather data cache (stores raw metric data from last API fetch)
+namespace WeatherCache {
+  bool valid = false;
+  bool failedLastRefresh = false;
+  float temp_c = 0;
+  float feels_like_c = 0;
+  int humidity = 0;
+  float pressure_hpa = 0;
+  float wind_speed_ms = 0;  // Always stored in m/s (meters per second) for both APIs
+  int wind_deg = 0;
+  char description[64] = "";
+  int wmo_code = 0;    // For OpenMeteo
+  bool has_wmo = false;
+}
+
+static void markWeatherFetchSuccess() {
+  WeatherCache::valid = true;
+  WeatherCache::failedLastRefresh = false;
+}
+
+static bool shouldClearWeatherCacheOnFailure() {
+  if (!WeatherCache::valid) {
+    FUNCTIONLOG("Weather", "Refresh failed with no cached weather available");
+    return true;
+  }
+
+  if (!WeatherCache::failedLastRefresh) {
+    WeatherCache::failedLastRefresh = true;
+    FUNCTIONLOG("Weather", "Refresh failed, keeping cached weather until the next interval");
+    return false;
+  }
+
+  WeatherCache::valid = false;
+  WeatherCache::failedLastRefresh = false;
+  FUNCTIONLOG("Weather", "Refresh failed twice, clearing cached weather");
+  return true;
+}
+
+// Build weather display string from cached data (no API refetch)
+bool MyNetwork::buildWeatherString() {
+  #if (DSP_MODEL!=DSP_DUMMY)
+    if (!weatherBuf) return false;
+
+    // If no cached data or cache expired, show loading message
+    if (!WeatherCache::valid) {
+      snprintf(weatherBuf, WEATHER_STRING_L, "%s", l10n(L10N_LBL_W_LOADING));
+      display.putRequest(NEWWEATHER);
+      return false;
+    }
+    
+    FUNCTIONLOG("Weather", "Rebuilding display string from cached data");
+    
+    // Convert temperature based on user preference
+    float temp_display = config.store.weathertempimp ? (WeatherCache::temp_c * 9.0 / 5.0 + 32.0) : WeatherCache::temp_c;
+    float feels_display = config.store.weathertempimp ? (WeatherCache::feels_like_c * 9.0 / 5.0 + 32.0) : WeatherCache::feels_like_c;
+    const char *tempUnit = config.store.weathertempimp ? "°F" : "°C";
+    
+    // Convert pressure based on user preference
+    float press_display = config.store.weatherpressimp ? (WeatherCache::pressure_hpa * 0.750062) : WeatherCache::pressure_hpa;
+    const char *pressUnit = config.store.weatherpressimp ? "mmHg" : "hPa";
+    
+    // Convert wind speed from cached m/s to user's preferred display unit
+    float wind_display;
+    const char *windUnit;
+    
+    if (strcmp(config.store.weatherwindspeed, "kmh") == 0) {
+      wind_display = WeatherCache::wind_speed_ms * 3.6;
+      windUnit = "km/h";
+    } else if (strcmp(config.store.weatherwindspeed, "mph") == 0) {
+      wind_display = WeatherCache::wind_speed_ms * 2.23694;
+      windUnit = "mph";
+    } else if (strcmp(config.store.weatherwindspeed, "kn") == 0) {
+      wind_display = WeatherCache::wind_speed_ms * 1.94384;
+      windUnit = "kn";
+    } else {  // ms
+      wind_display = WeatherCache::wind_speed_ms;
+      windUnit = "m/s";
+    }
+    
+    int wind_dir_idx = (int)(WeatherCache::wind_deg / 22.5) % 16;
+    
+    // Build weather string dynamically based on enabled fields
+    char *p = weatherBuf;
+    size_t remaining = WEATHER_STRING_L;
+    int written;
+    const char* desc = WeatherCache::has_wmo ? getWMODescription(WeatherCache::wmo_code) : WeatherCache::description;
+    written = snprintf(p, remaining, "%s, %.1f%s", desc, temp_display, tempUnit);
+    if (written > 0 && (size_t)written < remaining) { p += written; remaining -= written; }
+    
+    if (config.store.weatherfeels && remaining > 1) {
+      written = snprintf(p, remaining, " ~ %s %.1f%s", l10n(L10N_LBL_W_FEELSLIKE), feels_display, tempUnit);
+      if (written > 0 && (size_t)written < remaining) { p += written; remaining -= written; }
+    }
+    if (config.store.weatherpressure && remaining > 1) {
+      written = snprintf(p, remaining, " ~ %s %.0f %s", l10n(L10N_LBL_W_PRESSURE), press_display, pressUnit);
+      if (written > 0 && (size_t)written < remaining) { p += written; remaining -= written; }
+    }
+    if (config.store.weatherhumidity && remaining > 1) {
+      written = snprintf(p, remaining, " ~ %s %d%%", l10n(L10N_LBL_W_HUMIDITY), WeatherCache::humidity);
+      if (written > 0 && (size_t)written < remaining) { p += written; remaining -= written; }
+    }
+    if (config.store.weatherwind && remaining > 1) {
+      written = snprintf(p, remaining, " ~ %s %.1f %s [%s]", l10n(L10N_LBL_W_WIND), wind_display, windUnit, l10n_wind(wind_dir_idx));
+      if (written > 0 && (size_t)written < remaining) { p += written; remaining -= (size_t)written; }
+    }
+    
+    FUNCTIONLOG("Weather", "%s", weatherBuf);
+    display.putRequest(NEWWEATHER);
+    return true;
+  #endif
+  return false;
+}
+
+// Get weather from Open-Meteo API (free, no API key)
+bool getWeather_OpenMeteo(char *wstr) {
+  #if (DSP_MODEL!=DSP_DUMMY)
+    FUNCTIONLOG("Weather", "Calling Open-Meteo v1 API for current weather...");
+    
+    // Build URL - always request metric (Celsius, m/s, hPa) for consistent processing
+    // Wind speed: always request in m/s so we can cache and convert to any display unit
+    char url[512];
+    sprintf(url, "http://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&models=best_match&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_direction_10m,wind_speed_10m&forecast_days=1&wind_speed_unit=ms",
+            config.store.weatherlat, config.store.weatherlon);
+    
+    // Download JSON response to temp file (EspFileUpdater handles chunked encoding)
+    if (!downloadToTempFile(url)) {
+      FUNCTIONLOG("Weather", "Failed to download Open-Meteo data");
+      return false;
+    }
+    
+    // Read the downloaded JSON file
+    File file = SPIFFS.open(TMP_PATH, "r");
+    if (!file) {
+      FUNCTIONLOG("Weather", "Failed to open temp file");
+      return false;
+    }
+    
+    String response = file.readString();
+    file.close();
+    SPIFFS.remove(TMP_PATH);
+    
+    // Parse JSON with ArduinoJson
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, response);
+    if (error) {
+      FUNCTIONLOG("Weather", "Open-Meteo JSON parse error: %s", error.c_str());
+      return false;
+    }
+    
+    // Cache elevation if available and not already cached
+    if (doc["elevation"].is<float>() && config.store.weatherelevation == 0) {
+      float elevation = doc["elevation"];
+      config.store.weatherelevation = (int16_t)elevation;
+      config.saveValue(&config.store.weatherelevation, config.store.weatherelevation);
+      FUNCTIONLOG("Weather", "Elevation retrieved from Open-Meteo: %d meters", config.store.weatherelevation);
+    }
+    
+    JsonObject current = doc["current"];
+    if (current.isNull()) {
+      FUNCTIONLOG("Weather", "No current data in Open-Meteo response");
+      return false;
+    }
+    
+    // Get raw data from API (always in Celsius from Open-Meteo)
+    float temp_c = current["temperature_2m"];
+    float feels_like_c = current["apparent_temperature"];
+    int humidity = current["relative_humidity_2m"];
+    int wmo_code = current["weather_code"];
+    float pressure_hpa = current["surface_pressure"];  // hPa
+    float wind_speed_ms = current["wind_speed_10m"];  // Now always in m/s
+    int wind_deg = current["wind_direction_10m"];
+    
+    const char* description = getWMODescription(wmo_code);
+    
+    // Cache raw weather data for later string rebuilding
+    markWeatherFetchSuccess();
+    WeatherCache::temp_c = temp_c;
+    WeatherCache::feels_like_c = feels_like_c;
+    WeatherCache::humidity = humidity;
+    WeatherCache::pressure_hpa = pressure_hpa;
+    WeatherCache::wind_speed_ms = wind_speed_ms;  // Stored in consistent m/s
+    WeatherCache::wind_deg = wind_deg;
+    WeatherCache::wmo_code = wmo_code;
+    WeatherCache::has_wmo = true;
+    strncpy(WeatherCache::description, description, sizeof(WeatherCache::description) - 1);
+    WeatherCache::description[sizeof(WeatherCache::description) - 1] = '\0';
+    
+    
+    // Build display string from cached data
+    network.requestWeatherSync();
+    return network.buildWeatherString();
+  #endif
+  return false;
+}
+
+// Get weather from OpenWeather API 2.5 (legacy)
+bool getWeather_OpenWeather25(char *wstr) {
+  #if (DSP_MODEL!=DSP_DUMMY)
+    FUNCTIONLOG("Weather", "Calling OpenWeather API 2.5 for current weather...");
+    
+    // Check for API key
+    if (strlen(config.store.weatherkey) == 0) {
+      FUNCTIONLOG("Weather", "OpenWeather requires API key");
+      return false;
+    }
+    
+    // Build URL - always request metric for consistent processing
+    char url[512];
+    sprintf(url, "http://api.openweathermap.org/data/2.5/weather?lat=%s&lon=%s&units=metric&lang=%s&appid=%s",
+            config.store.weatherlat, config.store.weatherlon,
+            config.store.weatherlang, config.store.weatherkey);
+    
+    // Download JSON response to temp file (EspFileUpdater handles chunked encoding)
+    if (!downloadToTempFile(url)) {
+      FUNCTIONLOG("Weather", "Failed to download OpenWeather 2.5 data");
+      return false;
+    }
+    
+    // Read the downloaded JSON file
+    File file = SPIFFS.open(TMP_PATH, "r");
+    if (!file) {
+      FUNCTIONLOG("Weather", "Failed to open temp file");
+      return false;
+    }
+    
+    String response = file.readString();
+    file.close();
+    SPIFFS.remove(TMP_PATH);
+    
+    // Parse JSON with ArduinoJson
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, response);
+    if (error) {
+      FUNCTIONLOG("Weather", "OpenWeather 2.5 JSON parse error: %s", error.c_str());
+      return false;
+    }
+    
+    // Extract data (metric: Celsius, m/s, hPa)
+    const char* description = doc["weather"][0]["description"];
+    float temp_c = doc["main"]["temp"];
+    float feels_like_c = doc["main"]["feels_like"];
+    
+    // Use grnd_level if available, otherwise sea_level pressure
+    float pressure_hpa;
+    if (doc["main"]["grnd_level"].is<float>()) {
+      pressure_hpa = doc["main"]["grnd_level"];
+    } else if (doc["main"]["pressure"].is<float>()) {
+      pressure_hpa = doc["main"]["pressure"];
+    } else {
+      FUNCTIONLOG("Weather", "No pressure data in OpenWeather 2.5 response");
+      return false;
+    }
+    
+    int humidity = doc["main"]["humidity"];
+    float wind_speed_ms = doc["wind"]["speed"];  // m/s from metric API
+    int wind_deg = doc["wind"]["deg"];
+    
+    // Cache raw weather data for later string rebuilding
+    markWeatherFetchSuccess();
+    WeatherCache::temp_c = temp_c;
+    WeatherCache::feels_like_c = feels_like_c;
+    WeatherCache::humidity = humidity;
+    WeatherCache::pressure_hpa = pressure_hpa;
+    WeatherCache::wind_speed_ms = wind_speed_ms;  // Stored in m/s for OpenWeather
+    WeatherCache::wind_deg = wind_deg;
+    strncpy(WeatherCache::description, description, sizeof(WeatherCache::description) - 1);
+    WeatherCache::description[sizeof(WeatherCache::description) - 1] = '\0';
+    
+    // Build display string from cached data
+    network.requestWeatherSync();
+    return network.buildWeatherString();
+  #endif
+  return false;
+}
+
+// Helper: Fetch elevation from open-elevation.com API (fallback for OW 3.0)
+// Helper: Fetch and cache elevation from APIs (Open-Elevation with Open-Meteo fallback)
+void fetchAndCacheElevation() {
+  float lat = atof(config.store.weatherlat);
+  float lon = atof(config.store.weatherlon);
+  float elevation = 0.0;
+  bool success = false;
+  
+  // Try Open-Elevation API first
+  FUNCTIONLOG("Weather", "Getting elevation from Open-Elevation...");
+  char url[256];
+  sprintf(url, "http://api.open-elevation.com/api/v1/lookup?locations=%.4f,%.4f", lat, lon);
+  
+  if (downloadToTempFile(url)) {
+    File file = SPIFFS.open(TMP_PATH, "r");
+    if (file) {
+      String response = file.readString();
+      file.close();
+      
+      JsonDocument doc;
+      if (deserializeJson(doc, response) == DeserializationError::Ok) {
+        if (doc["results"][0]["elevation"].is<float>()) {
+          elevation = doc["results"][0]["elevation"];
+          success = true;
+        }
+      }
+    }
+  }
+  
+  // Fall back to Open-Meteo if Open-Elevation failed
+  if (!success) {
+    FUNCTIONLOG("Weather", "Getting elevation from Open-Meteo...");
+    sprintf(url, "https://api.open-meteo.com/v1/elevation?latitude=%.4f&longitude=%.4f", lat, lon);
+    
+    if (downloadToTempFile(url)) {
+      File file = SPIFFS.open(TMP_PATH, "r");
+      if (file) {
+        String response = file.readString();
+        file.close();
+        
+        JsonDocument doc;
+        if (deserializeJson(doc, response) == DeserializationError::Ok) {
+          if (doc["elevation"].is<float>()) {
+            elevation = doc["elevation"];
+            success = true;
+          }
+        }
+      }
+    }
+  }
+  
+  // Clean up temp file
+  SPIFFS.remove(TMP_PATH);
+  
+  // Cache elevation if successfully retrieved
+  if (success && elevation > 0.0) {
+    config.store.weatherelevation = (int16_t)elevation;
+    config.saveValue(&config.store.weatherelevation, config.store.weatherelevation);
+    FUNCTIONLOG("Weather", "Caching elevation: %d meters", config.store.weatherelevation);
+  } else {
+    FUNCTIONLOG("Weather", "Failed to retrieve elevation from all sources");
+  }
+}
+
+// Helper: Calculate ground-level pressure from sea-level pressure using elevation
+float calculateGroundPressure(float seaLevelPressure, float elevationMeters) {
+  // Barometric formula: P_ground = P_sea * (1 - elevation / 44330)^5.255
+  if (elevationMeters == 0.0) return seaLevelPressure;
+  return seaLevelPressure * pow((1.0 - elevationMeters / 44330.0), 5.255);
+}
+
+// Get weather from OpenWeather API 3.0 (current)
+bool getWeather_OpenWeather30(char *wstr) {
+  #if (DSP_MODEL!=DSP_DUMMY)
+    FUNCTIONLOG("Weather", "Calling OpenWeather API 3.0 for current weather...");
+    
+    // Check for API key
+    if (strlen(config.store.weatherkey) == 0) {
+      FUNCTIONLOG("Weather", "OpenWeather requires API key");
+      return false;
+    }
+    
+    // Build URL - always request metric for consistent processing
+    char url[512];
+    sprintf(url, "http://api.openweathermap.org/data/3.0/onecall?exclude=minutely,hourly,daily&lat=%s&lon=%s&units=metric&lang=%s&appid=%s",
+            config.store.weatherlat, config.store.weatherlon,
+            config.store.weatherlang, config.store.weatherkey);
+    
+    // Download JSON response to temp file (EspFileUpdater handles chunked encoding)
+    if (!downloadToTempFile(url)) {
+      FUNCTIONLOG("Weather", "Failed to download OpenWeather 3.0 data");
+      return false;
+    }
+    
+    // Read the downloaded JSON file
+    File file = SPIFFS.open(TMP_PATH, "r");
+    if (!file) {
+      FUNCTIONLOG("Weather", "Failed to open temp file");
+      return false;
+    }
+    
+    String response = file.readString();
+    file.close();
+    SPIFFS.remove(TMP_PATH);
+    
+    // Parse JSON with ArduinoJson
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, response);
+    if (error) {
+      FUNCTIONLOG("Weather", "OpenWeather 3.0 JSON parse error: %s", error.c_str());
+      return false;
+    }
+    
+    JsonObject current = doc["current"];
+    if (current.isNull()) {
+      FUNCTIONLOG("Weather", "No current data in OpenWeather 3.0 response");
+      return false;
+    }
+    
+    // Extract data (metric: Celsius, m/s, hPa)
+    const char* description = current["weather"][0]["description"];
+    float temp_c = current["temp"];
+    float feels_like_c = current["feels_like"];
+    float pressure_sea_hpa = current["pressure"];  // Sea-level pressure
+    int humidity = current["humidity"];
+    float wind_speed_ms = current["wind_speed"];  // m/s from metric API
+    int wind_deg = current["wind_deg"];
+    int wind_dir_idx = (int)(wind_deg / 22.5) % 16;
+    
+    // Get or fetch elevation for barometric adjustment
+    float elevation = 0.0;
+    if (config.store.weatherelevation != 0) {
+      elevation = (float)config.store.weatherelevation;
+      FUNCTIONLOG("Weather", "Using cached elevation: %d meters", config.store.weatherelevation);
+    } else {
+      // Fetch and cache elevation
+      fetchAndCacheElevation();
+      elevation = (float)config.store.weatherelevation;
+    }
+    
+    // Calculate ground-level pressure from sea-level pressure
+    float pressure_hpa = calculateGroundPressure(pressure_sea_hpa, elevation);
+    FUNCTIONLOG("Weather", "Adjusted pressure from %.0f hPa (sea) to %.0f hPa (ground) using %.0f m elevation",
+                  pressure_sea_hpa, pressure_hpa, elevation);
+    
+    // Cache raw weather data for later string rebuilding
+    markWeatherFetchSuccess();
+    WeatherCache::temp_c = temp_c;
+    WeatherCache::feels_like_c = feels_like_c;
+    WeatherCache::humidity = humidity;
+    WeatherCache::pressure_hpa = pressure_hpa;  // Ground-level adjusted
+    WeatherCache::wind_speed_ms = wind_speed_ms;  // Stored in m/s for OpenWeather
+    WeatherCache::wind_deg = wind_deg;
+    strncpy(WeatherCache::description, description, sizeof(WeatherCache::description) - 1);
+    WeatherCache::description[sizeof(WeatherCache::description) - 1] = '\0';
+    
+    // Build display string from cached data
+    network.requestWeatherSync();
+    return network.buildWeatherString();
+  #endif
+  return false;
+}
+
+bool getWeather(char *wstr) {
+  #if (DSP_MODEL!=DSP_DUMMY)
+    // Provider dispatcher - route to appropriate weather API
+    if (strcmp(config.store.weatherapi, "OW30") == 0) {
+      return getWeather_OpenWeather30(wstr);
+    } else if (strcmp(config.store.weatherapi, "OW25") == 0) {
+      return getWeather_OpenWeather25(wstr);
+    } else {  // Default: "OM1" or any other value
+      return getWeather_OpenMeteo(wstr);
+    }
+  #endif
+  return false;
+}

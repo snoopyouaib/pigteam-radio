@@ -1,0 +1,31 @@
+{
+	"files.associations": {
+		"array": "cpp",
+		"deque": "cpp",
+		"list": "cpp",
+		"string": "cpp",
+		"unordered_map": "cpp",
+		"unordered_set": "cpp",
+		"vector": "cpp",
+		"string_view": "cpp",
+		"initializer_list": "cpp",
+		"regex": "cpp",
+		"fstream": "cpp",
+		"typeinfo": "cpp",
+		"cstddef": "cpp"
+	},
+	"filewatcher.isClearStatusBar": true,
+	"filewatcher.statusBarDelay": 3000,
+	"filewatcher.commands": [
+		{
+			"match": "platformio.ini",
+			"cmd": "if \"${file}\"==\"${workspaceRoot}\\platformio.ini\" copy \"${file}\" \"${workspaceRoot}\\builds\\username\\platformio.ini\"", 
+			"event": "onFileChange"
+		},
+		{
+			"match": "myoptions.h",
+			"cmd": "if \"${file}\"==\"${workspaceRoot}\\myoptions.h\" copy \"${file}\" \"${workspaceRoot}\\builds\\username\\myoptions.h\"", 
+			"event": "onFileChange"
+		}
+	]
+}

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#e3d25f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" id="themeCSS" href="theme.css" type="text/css">
+  <link rel="stylesheet" id="styleCSS" href="style.css" type="text/css">
+  <title>ehRadio - Search</title>
+</head>
+
+<body>
+  <div id="searchcontent">
+    <div id="searchheader">
+      <h2 class="searchtitle1" data-i18n="ttl_search">Search</h2>
+      <h2 class="searchtitle2 hidden"><a href="curated.html" data-i18n="ttl_curated">Curated Lists</a></h2>
+    </div>
+    <div class="quicksearches">
+      <table class="quicksearchtable">
+        <tr>
+          <td><button class="quicksearch" data-genre="60s">60s</button></td>
+          <td><button class="quicksearch" data-genre="70s">70s</button></td>
+          <td><button class="quicksearch" data-genre="80s">80s</button></td>
+          <td><button class="quicksearch" data-genre="90s">90s</button></td>
+          <td><button class="quicksearch" data-genre="2000s">2000s</button></td>
+          <td><button class="quicksearch" data-genre="2010s">2010s</button></td>
+        </tr>
+        <tr>
+          <td><button class="quicksearch" data-genre="pop">pop</button></td>
+          <td><button class="quicksearch" data-genre="top 40">top 40</button></td>
+          <td><button class="quicksearch" data-genre="pop rock">pop rock</button></td>
+          <td><button class="quicksearch" data-genre="oldies">oldies</button></td>
+          <td><button class="quicksearch" data-genre="classic hits">classic hits</button></td>
+          <td><button class="quicksearch" data-genre="rock">rock</button></td>
+        </tr>
+        <tr>
+          <td><button class="quicksearch" data-genre="classic rock">classic rock</button></td>
+          <td><button class="quicksearch" data-genre="country">country</button></td>
+          <td><button class="quicksearch" data-genre="gospel">gospel</button></td>
+          <td><button class="quicksearch" data-genre="folk">folk</button></td>
+          <td><button class="quicksearch" data-genre="indie">indie</button></td>
+          <td><button class="quicksearch" data-genre="jazz">jazz</button></td>
+        </tr>
+        <tr>
+          <td><button class="quicksearch" data-genre="hiphop">hiphop</button></td>
+          <td><button class="quicksearch" data-genre="classical">classical</button></td>
+          <td><button class="quicksearch" data-genre="chillout">chillout</button></td>
+          <td><button class="quicksearch" data-genre="ambient">ambient</button></td>
+          <td><button class="quicksearch" data-genre="electronic">electronic</button></td>
+          <td><button class="quicksearch" data-genre="metal">metal</button></td>
+        </tr>
+      </table>
+    </div> <!-- end of quick searches -->
+    <div id="searches">
+      <div class="sort-row">
+        <span data-i18n="lbl_sort">Sort</span>
+        <label for="order_name"><input type="radio" id="order_name" name="sortorder" value="name" /><span data-i18n="lbl_name">Name</span></label>
+        <label for="order_clickcount"><input type="radio" id="order_clickcount" name="sortorder" value="clickcount" checked /><span data-i18n="lbl_clicks">Clicks</span></label>
+        <label for="order_votes"><input type="radio" id="order_votes" name="sortorder" value="votes" /><span data-i18n="lbl_votes">Votes</span></label>
+        <label for="order_country"><input type="radio" id="order_country" name="sortorder" value="country" /><span data-i18n="lbl_country">Country</span></label>
+        <label for="order_language"><input type="radio" id="order_language" name="sortorder" value="language" /><span data-i18n="lbl_language">Language</span></label>
+      </div>
+      <div id="searchRow1" class="search-row">
+        <button class="searchbutton search plus" id="addSearchRowBtn" title="Add search criteria" data-i18n="ttl_add_search">
+          <svg viewBox="0 0 24 24" class="stroke">
+            <path d="M5 12h7m7 0h-7m0 0V5m0 7v7" />
+          </svg>
+        </button>
+        <select id="searchType1" class="searchtextinput select">
+          <option value="name" data-i18n="lbl_name">Name</option>
+          <option value="tag" data-i18n="lbl_tag_genre">Tag / Genre</option>
+          <option value="country" data-i18n="lbl_country">Country</option>
+          <option value="countrycode" data-i18n="lbl_country_code">Country Code</option>
+          <option value="language" data-i18n="lbl_language">Language</option>
+        </select>
+        <input type="text" class="searchtextinput" id="searchInput1" placeholder="Enter search term" data-i18n="msg_searchterm">
+        <button class="searchbutton search" id="searchBtn" disabled data-i18n="btn_search">Search</button>
+      </div>
+      
+      <!-- SVG icons from https://www.svgviewer.dev/s/495943/plus & https://www.svgviewer.dev/s/473138/minus -->
+      <div id="searchRow2" class="search-row hidden">
+        <button class="searchbutton search minus" id="removeSearchRowBtn2" data-row="2" title="Remove search criteria" data-i18n="ttl_remove_search">
+          <svg viewBox="0 0 24 24" class="stroke">
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+        <select id="searchType2" class="searchtextinput select">
+          <option value="name" data-i18n="lbl_name">Name</option>
+          <option value="tag" data-i18n="lbl_tag_genre">Tag / Genre</option>
+          <option value="country" data-i18n="lbl_country">Country</option>
+          <option value="countrycode" data-i18n="lbl_country_code">Country Code</option>
+          <option value="language" data-i18n="lbl_language">Language</option>
+        </select>
+        <input type="text" class="searchtextinput" id="searchInput2" placeholder="Enter search term">
+      </div>
+      <div id="searchRow3" class="search-row hidden">
+        <button class="searchbutton search minus" id="removeSearchRowBtn3" data-row="3" title="Remove search criteria" data-i18n="ttl_remove_search">
+          <svg viewBox="0 0 24 24" class="stroke">
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+        <select id="searchType3" class="searchtextinput select">
+          <option value="name" data-i18n="lbl_name">Name</option>
+          <option value="tag" data-i18n="lbl_tag_genre">Tag / Genre</option>
+          <option value="country" data-i18n="lbl_country">Country</option>
+          <option value="countrycode" data-i18n="lbl_country_code">Country Code</option>
+          <option value="language" data-i18n="lbl_language">Language</option>
+        </select>
+        <input type="text" class="searchtextinput" id="searchInput3" placeholder="Enter search term">
+      </div>
+    </div> <!-- end of searches -->
+    <div class="searchwrap"><!--scrollable search results table -->
+      <div class="scrollable">
+        <table class="stations" id="stationsTable">
+          <!-- Table rows will be dynamically added here -->
+        </table>
+      </div>
+    </div><!--searchwrap-->
+    <!-- Page navigation -->
+    <div id="pageNav" class="page-navigation">
+      <button class="searchbutton hidden" id="prevSearchPageBtn">&larr;</button>
+      <span class="hidden" id="pageDisplay">Page 1</span>
+      <button class="searchbutton hidden" id="nextSearchPageBtn">&rarr;</button>
+    </div>
+    <div class="fb" data-name="searchdone" id="searchdone" data-i18n="btn_done">Done</div>
+    <div id="copy">Search by <a target="_blank" href="https://radio-browser.info/">RadioBrowser</a> &mdash; Problem? Check <a target="_blank" href="https://api.radio-browser.info/net">the status</a></div>
+  </div>
+</body>
+
+<script src="variables.js"></script>
+<script src="curated_variables.js"></script>
+<script src="locale.js"></script>
+<script src="script2.js"></script>
+<script src="search.js"></script>
+
+</html>

@@ -1,0 +1,41 @@
+[ { "title": "Audio Decoder",
+    "info": "Read more: https://github.com/trip5/ehRadio#audio-decoder" },
+  {
+    "name": "VS1053 (SPI Audio Decoder)",
+    "info": "Highly recommended to make VS1053 the sole device on the SPI bus\nIf VS_PATCH_ENABLE is true, it is required\nOther SPI devices can share a bus\nVS1003 will work but only decode MP3",
+    "pins": [ "VS1053_CS", "VS1053_DCS", "VS1053_DREQ" ],
+    "defines": [
+      { "define": "VS1053_SPI", "type": "spi", "comment": "assign VS1053 to SPI bus" },
+      { "define": "VS1053_RST", "type": "pin", "default": -1, "optional": true, "comment": "pin RST is attached to (-1 for EN pin)"},
+      { "define": "VS_PATCH_ENABLE", "type": "boolean", "default": false, "comment": "Enables VU Meter with VS1053b boards - disabled by default" },
+      { "define": "VS1053_VOL_CURVE", "type": "boolean", "default": false, "comment": "Uses a slightly different volume curve that may be better when paired with an amplifier" }
+    ],
+    "lib_deps": "",
+    "build_src_filter": "+<libraries/VS1053_Audio/*>"
+  },
+  {
+    "name": "I2S (PCM I2S Decoder)",
+    "pins": [ "I2S_DOUT", "I2S_BCLK", "I2S_LRC" ],
+    "defines": [
+      { "define": "MUTE_PIN", "type": "pin", "default": 255, "optional": true, "comment": "pin MUTE is attached to (255 for unused)" }
+    ],
+    "lib_deps": "",
+    "build_src_filter": "+<libraries/I2S_Audio/*>"
+  },
+  {
+    "name": "ES8311 (PCM I2S Mono Decoder)",
+    "info": "onboard decoder on some ESP32-S3/Display boards",
+    "define": "USE_ES8311",
+    "pins": [ "I2S_MCLK", "I2S_BCLK", "I2S_LRC", "I2S_DOUT", "I2S_DIN" ],
+    "defines": [
+      { "define": "MUTE_PIN", "type": "pin", "default": 255, "optional": true, "comment": "pin MUTE is attached to (255 for unused)"},
+      { "define": "ES8311_I2C_SDA", "type": "pin", "default": 255, "optional": true, "comment": "may fix volume control on boot"},
+      { "define": "ES8311_I2C_SCL", "type": "pin", "default": 255, "optional": true, "comment": "may fix volume control on boot"},
+      { "define": "MUTE_VAL", "type": "enum", "options": ["HIGH", "LOW"], "default": "HIGH", "optional": false, "comment": "enables turning off audio amplifier" },
+      { "define": "ES8311_MAX_I2S", "type": "numeric", "min": 0, "max": 255, "default": 180, "optional": false, "comment": "maximum I2S value to allow when mapping to ES8311 codec (0..254)"},
+      { "define": "PLAYER_FORCE_MONO", "type": "boolean", "default": true, "optional": false, "comment": "forces VU meter to mono mode"}
+    ],
+    "lib_deps": "",
+    "build_src_filter": ["+<libraries/I2S_Audio/*>", "+<libraries/ES8311_Audio/*>"]
+  }
+]

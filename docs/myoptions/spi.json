@@ -1,0 +1,15 @@
+[ { "title": "SPI Bus Pins",
+    "info": "ehRadio uses 'Named Buses' A and B to identify which bus is primary (A) and which is secondary (B)." },
+  {
+    "name": "SPI Bus A",
+    "info": "Required by SPI Display\nIf display ties CS to GND then it must be the only device on SPI Bus A\nIf display is the only device on this bus, set SPIA_MISO = 255\nHighly recommended to use default pins!",
+    "spi": "A",
+    "pins": [ "SPIA_SCK", "SPIA_MISO", "SPIA_MOSI" ]
+  },
+  {
+    "name": "SPI Bus B",
+    "info": "The recommended bus for VS1053 when using an SPI display\nUse safe non-strapping pins only!",
+    "spi": "B",
+    "pins": [ "SPIB_SCK", "SPIB_MISO", "SPIB_MOSI" ]
+  }
+]

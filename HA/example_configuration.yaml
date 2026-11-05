@@ -1,0 +1,20 @@
+
+# Configure a default setup of Home Assistant (frontend, api, etc)
+default_config:
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+group: !include groups.yaml
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# ehRadio entity (relies on MQTT)
+media_player:
+  - platform: ehradio
+    name: My ehRadio
+    root_topic: ehradio/myradio/
+    # fallback_image: "https://example.com/my-custom-logo.png"  # optional: override default logo shown when no station art is available
+    # device_url: "http://192.168.1.100/"  # optional: link to device web UI; auto-detected from playlist if not set

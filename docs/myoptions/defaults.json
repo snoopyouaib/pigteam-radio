@@ -1,0 +1,82 @@
+[ { "title": "User Defaults",
+    "info": "This sets first-boot defaults and are still changeable in the WebUI.\nThese are only defaults and will not be applied if the setting is found in NVS Preferences.\nPreferences are only saved to NVS if changed from the default." },
+
+  { "type": "locale_select", "name": "Display Locale", "define": "DSP_LOCALE" },
+  { "type": "timezone_select", "name": "Time Zone", "define": "TIMEZONE" },
+  {
+    "name": "Clock 12 Hour Mode",
+    "define": "CLOCK_TWELVE", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Numbered Playlist",
+    "define": "NUMBERED_PLAYLIST", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "One Click Switch",
+    "define": "ONE_CLICK_SWITCH", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Playlist Default URL",
+    "define": "PLAYLIST_DEFAULT_URL", "type": "text", "optional": true, "comment": "downloaded on fresh install"
+  },
+  {
+    "name": "Screen Flip",
+    "define": "SCREEN_FLIP", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Screen Saver When Playing",
+    "define": "SS_PLAYING", "type": "boolean", "optional": true, "default": false
+  },
+    {
+    "name": "Screen Saver When Not Playing",
+    "define": "SS_NOTPLAYING", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "SD Shuffle",
+    "define": "SD_SHUFFLE", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Show Buffer Bar",
+    "define": "SHOW_BUFFERBAR", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Show VU Meter",
+    "define": "SHOW_VU_METER", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Smart Start",
+    "define": "SMART_START", "type": "boolean", "optional": true, "default": true
+  },
+  {
+    "name": "SNTP Time Server 1",
+    "define": "SNTP_1", "type": "text", "optional": true, "default": "0.pool.ntp.org"
+  },
+  {
+    "name": "SNTP Time Server 2",
+    "define": "SNTP_2", "type": "text", "optional": true, "default": "pool.ntp.org"
+  },
+  {
+    "name": "Touch Flip",
+    "define": "TOUCH_FLIP", "type": "text", "optional": true, "default": false
+  },
+  {
+    "name": "Volume Page",
+    "define": "VOLUME_PAGE", "type": "boolean", "optional": true, "default": false
+  },
+  {
+    "name": "Weather Metric",
+    "define": "WEATHER_METRIC", "type": "boolean", "optional": true, "default": true
+  },
+  {
+    "name": "Weather - Latitude",
+    "define": "WEATHER_LAT", "type": "text", "optional": true, "comment": "latitude", "default": "44.64738"
+  },
+  {
+    "name": "Weather - Longitude",
+    "define": "WEATHER_LON", "type": "text", "optional": true, "comment": "longitude", "default": "-63.58029"
+  },
+  {
+    "name": "Wifi Scan for Best RSSI",
+    "define": "WIFI_SCAN_BEST_RSSI", "type": "boolean", "optional": true, "default": true
+  }
+]

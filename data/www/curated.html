@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#e3d25f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" id="themeCSS" href="theme.css" type="text/css">
+  <link rel="stylesheet" id="styleCSS" href="style.css" type="text/css">
+  <title>ehRadio - Curated Lists</title>
+</head>
+
+<body>
+  <div id="curatedcontent">
+    <div id="curatedheader">
+      <h2 class="searchtitle1" data-i18n="ttl_curated">Curated Lists</h2>
+      <h2 class="searchtitle2"><a href="search.html" data-i18n="ttl_search">Search</a></h2>
+    </div>
+    
+    <div id="loadSection">
+      <input type="button" class="fb searchbutton" id="loadListsBtn" value="Load Index" onclick="loadCuratedIndex(this)" data-i18n="btn_load_index" />
+    </div><!-- end of header area -->
+
+    <div id="indexwrap" class="scrollable">
+      <table class="stations" id="indexTable">
+        <!-- Index rows will be dynamically added here -->
+      </table>
+    </div>
+
+    <h3 class="sectiontitle" id="playlistSectionTitle" data-i18n="ttl_select_playlist">Select a Playlist</h3>
+    <div id="listwrap" class="scrollable">
+      <table class="stations" id="playlistTable">
+      </table>
+    </div>
+
+    <!-- footer begins -->
+    <div id="importSection">
+      <button class="fb searchbutton" id="replaceBtn" disabled data-i18n="btn_replace_playlist">Replace Playlist</button>
+      <button class="fb searchbutton" id="mergeBtn" disabled data-i18n="btn_merge_playlist">Merge with Playlist</button>
+    </div>
+
+
+    <div class="fb" id="curateddone" data-i18n="btn_done">Done</div>
+    <div id="copy">Curated lists from <span id="curatedBy"></span></div>
+  </div>
+</body>
+
+<script src="variables.js"></script>
+<script src="curated_variables.js"></script>
+<script src="locale.js"></script>
+<script src="script2.js"></script>
+<script src="curated.js"></script>
+
+</html>

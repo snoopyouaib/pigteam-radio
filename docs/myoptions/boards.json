@@ -1,0 +1,22 @@
+[
+  {
+    "name": "ESP32-S3-DevKitC-1 N16R4 (16MB Flash 4MB PSRAM)",
+    "file": "ESP32-S3-DevKitC-1_N16R4.json"
+  },
+  {
+    "name": "ESP32-S3-DevKitC-1 N16R8 (16MB Flash 8MB PSRAM)",
+    "file": "ESP32-S3-DevKitC-1_N16R8.json"
+  },
+  {
+    "name": "ESP32-S3-DevKitC-1 N8R8 (8MB Flash 8MB PSRAM)",
+    "file": "ESP32-S3-DevKitC-1_N8R8.json"
+  },
+  {
+    "name": "ESP32-S3 ES3C28P (ESP32-S3-N16R8)",
+    "file": "ESP32-S3-ES3C28P.json"
+  },
+  {
+    "name": "ESP32-S3 N16R8 (16MB Flash 8MB PSRAM) (42 Pin)",
+    "file": "ESP32-S3_N16R8_42Pin.json"
+  }
+]
