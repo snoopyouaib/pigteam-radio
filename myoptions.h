@@ -2,13 +2,18 @@
 #define myoptions_h
 
 /* ------------------------------------------------------------------
-   ehRadio - ESP32-S3 N16R8 + PCM5102 (I2S)
-   Rappel N16R8 : GPIO 35, 36, 37 interdits (PSRAM octal), 26-32 reserves.
+   ehRadio - PigTeam - 3 cartes, choisies par l'environnement PlatformIO :
+     ehradio_s3_n16r8      : ESP32-S3 N16R8 + ILI9341 tactile (ou OLED) + PCM5102
+     ehradio_s3_zero       : ESP32-S3-Zero 4 Mo + OLED 1,3" + rotatif + 2 boutons
+     ehradio_s3_tiny_tft   : ESP32-S3-Tiny N8R8 + TFT ST7789 + rotatif + BACK
 
-   CHOIX DE L'ECRAN (un seul a la fois) :
-     1 = petit OLED 1,3" I2C (SH1106, 128x64), sans tactile
-     0 = TFT ILI9341 240x320 SPI + tactile XPT2046
+   Commandes des cartes SANS tactile (Zero et Tiny) :
+     rotatif : tourner = volume
+               clic    = ouvrir la liste des stations (patch controls.cpp, voir ENC_CLICK_OPENS_LIST)
+               dans la liste : tourner = choisir, clic = valider et sortir
+     bouton lecture : clic = lecture / arret (en liste : valide et sort), appui long = liste <-> lecteur
    ------------------------------------------------------------------ */
+
 #ifdef CARTE_ZERO
 /* ------------------------------------------------------------------
    Env ehradio_s3_zero : ESP32-S3-Zero (4 Mo flash, 2 Mo PSRAM) soudee sur le
@@ -25,17 +30,14 @@
   #define I2C_SDA       8
   #define I2C_SCL       9
 
-  /* Pas de tactile : rotatif = encodeur 2
-       tourner        = station precedente / suivante
-       tourner appuye = volume
-       clic           = lecture / arret
-     Boutons : CONFIRM = volume +, BACK = volume - */
-  #define ENC2_CLK      11
-  #define ENC2_DT       12
-  #define ENC2_SW       10
-  #define ENC2_STEPS    2             /* 2 pour un EC11 ; 4 si un cran saute */
-  #define BTN_UP        7
-  #define BTN_DOWN      13
+  /* Rotatif = encodeur 1 : tourner = volume, clic = liste des stations */
+  #define ENC_CLK       11
+  #define ENC_DT        12
+  #define ENC_SW        10
+  #define ENC_STEPS     4             /* EC11 : 4 transitions par cran (2 = saute de 2 stations par cran) */
+  #define ENC_CLICK_OPENS_LIST        /* clic rotatif = liste (necessite le patch controls.cpp) */
+  #define BTN_PLAY      7             /* CONFIRM : lecture / arret */
+  #define BTN_MODE      13            /* BACK : double-clic = muet, appui long = veille */
 
   #define I2S_DOUT      4             /* PCM5102 DIN */
   #define I2S_BCLK      5             /* PCM5102 BCK */
@@ -67,55 +69,62 @@
   #define BATTERY_PIN           1
   #define BATTERY_DIVIDER_RATIO 2.0
 
-  /* Pas de tactile : rotatif = encodeur 2
-       tourner        = station precedente / suivante
-       tourner appuye = volume
-       clic           = lecture / arret
-     BACK : double-clic = muet, appui long = veille profonde */
-  #define ENC2_CLK      17
-  #define ENC2_DT       18
-  #define ENC2_SW       44
-  #define ENC2_STEPS    2             /* 2 pour un EC11 ; 4 si un cran saute */
-  #define BTN_MODE      43
+  /* Rotatif = encodeur 1 : tourner = volume, clic = liste des stations
+       dans la liste : tourner = choisir, clic = valider et sortir
+     BACK = BTN_PLAY : clic = lecture / arret, appui long = liste <-> lecteur */
+  #define ENC_CLK       17
+  #define ENC_DT        18
+  #define ENC_SW        44
+  #define ENC_STEPS     4             /* EC11 : valeurs permises 1, 2 ou 4 seulement */
+  #define ENC_CLICK_OPENS_LIST        /* clic rotatif = liste (necessite le patch controls.cpp) */
+  #define BTN_PLAY      43
 
   #define I2S_DOUT      4             /* PCM5102 DIN */
   #define I2S_BCLK      5             /* PCM5102 BCK */
   #define I2S_LRC       6             /* PCM5102 LCK */
   #define VS1053_CS     255
 #else
+/* ------------------------------------------------------------------
+   Env ehradio_s3_n16r8 : ESP32-S3 N16R8 + PCM5102 (I2S)
+   Rappel N16R8 : GPIO 35, 36, 37 interdits (PSRAM octal), 26-32 reserves.
+
+   CHOIX DE L'ECRAN (un seul a la fois) :
+     1 = petit OLED 1,3" I2C (SH1106, 128x64), sans tactile
+     0 = TFT ILI9341 240x320 SPI + tactile XPT2046
+   ------------------------------------------------------------------ */
   #define ECRAN_OLED 0
 
-#if ECRAN_OLED
-  /* OLED 1,3" I2C : SDA -> GPIO 4, SCL -> GPIO 5, VCC 3,3 V, GND.
-     Si l'image est decalee ou brouillee, essaie DSP_SSD1306 a la place.
-     Adresse I2C 0x3C par defaut ; si l'ecran reste noir, certains modules
-     sont en 0x3D (voir SCREEN_ADDRESS dans options.h). */
-  #define DSP_MODEL     DSP_SH1106
-  #define I2C_SDA       4
-  #define I2C_SCL       5
-#else
-  /* TFT ILI9341 + tactile XPT2046 (bus SPI A : SCK=12, MISO=13, MOSI=11) */
-  #define DSP_MODEL     DSP_ILI9341
-  #define SPIA_DEFAULT
-  #define TFT_CS        10
-  #define TFT_DC         9
-  #define TFT_RST        8
-  #define TS_MODEL      TS_MODEL_XPT2046
-  #define TS_SPI        'A'
-  #define TS_CS         14
-#endif
+  #if ECRAN_OLED
+    /* OLED 1,3" I2C : SDA -> GPIO 4, SCL -> GPIO 5, VCC 3,3 V, GND.
+       Si l'image est decalee ou brouillee, essaie DSP_SSD1306 a la place.
+       Adresse I2C 0x3C par defaut ; si l'ecran reste noir, certains modules
+       sont en 0x3D (voir SCREEN_ADDRESS dans options.h). */
+    #define DSP_MODEL     DSP_SH1106
+    #define I2C_SDA       4
+    #define I2C_SCL       5
+  #else
+    /* TFT ILI9341 + tactile XPT2046 (bus SPI A : SCK=12, MISO=13, MOSI=11) */
+    #define DSP_MODEL     DSP_ILI9341
+    #define SPIA_DEFAULT
+    #define TFT_CS        10
+    #define TFT_DC         9
+    #define TFT_RST        8
+    #define TS_MODEL      TS_MODEL_XPT2046
+    #define TS_SPI        'A'
+    #define TS_CS         14
+  #endif
 
-/* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
-#define I2S_DOUT      16   /* PCM5102 DIN */
-#define I2S_BCLK      17   /* PCM5102 BCK */
-#define I2S_LRC       15   /* PCM5102 LCK (LRCK / WS) */
-#define VS1053_CS     255  /* 255 = VS1053 non utilise */
+  /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
+  #define I2S_DOUT      16   /* PCM5102 DIN */
+  #define I2S_BCLK      17   /* PCM5102 BCK */
+  #define I2S_LRC       15   /* PCM5102 LCK (LRCK / WS) */
+  #define VS1053_CS     255  /* 255 = VS1053 non utilise */
 #endif
 
 /* Recherche Radio-Browser : tampon de telechargement 32 Ko (PSRAM). */
 #define SEARCHRESULTS_BUFFER 32
 
-/* Police de l'horloge : YO_MONO = 7 segments fins façon yoRadio.
+/* Police de l'horloge : YO_MONO = 7 segments fins facon yoRadio.
    Autres choix : CHUNKY6_PX (gros pixels, defaut) ou CHUNKY6.
    CLOCKGLOW = fond "afficheur allume" derriere les chiffres. */
 #define CLOCKFONT YO_MONO

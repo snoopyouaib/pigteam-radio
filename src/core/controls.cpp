@@ -9,6 +9,7 @@
 #include "network.h"
 #include <SD.h>
 #include "sdmanager.h"
+#include "driver/gpio.h"
 
 #if IR_PIN!=255
   #include <assert.h>
@@ -73,6 +74,15 @@ void Controls::btnLongPressStopCb(void* p)   { controls.onBtnLongPressStop((int)
 // Lookup table: user-facing 0-7 scale ??raw encoder acceleration 0-700
 static const uint16_t encAccelLUT[8] = {0, 5, 11, 26, 59, 135, 307, 700};
 
+#if ISPUSHBUTTONS
+// PATCH PigTeam : re-arme la broche d'un bouton (libere GPIO43/44 de la fonction UART0)
+static void rearmBtnPin(int pin, bool pullup) {
+  if (pin == 255) return;
+  gpio_reset_pin((gpio_num_t)pin);
+  pinMode(pin, pullup ? INPUT_PULLUP : INPUT);
+}
+#endif
+
 void Controls::init() {
   #if ENC_DT!=255
     encoder.begin();
@@ -88,6 +98,12 @@ void Controls::init() {
   #endif
 
   #if ISPUSHBUTTONS
+    rearmBtnPin(BTN_DOWN, BTN_DOWN_PULLUP);
+    rearmBtnPin(BTN_PLAY, BTN_PLAY_PULLUP);
+    rearmBtnPin(BTN_UP, BTN_UP_PULLUP);
+    rearmBtnPin(BTN_PREV, BTN_PREV_PULLUP);
+    rearmBtnPin(BTN_NEXT, BTN_NEXT_PULLUP);
+    rearmBtnPin(BTN_MODE, BTN_MODE_PULLUP);
     for (int i = 0; i < nrOfButtons; i++) {
       if ((i == EVT_BTN_DOWN && BTN_DOWN == 255) || (i == EVT_BTN_PLAY && BTN_PLAY == 255) || (i == EVT_BTN_UP && BTN_UP == 255) || (i == EVT_ENC_SW && ENC_SW == 255) || (i == EVT_BTN_PREV && BTN_PREV == 255) || (i == EVT_BTN_NEXT && BTN_NEXT == 255) || (i == EVT_ENC2_SW && ENC2_SW == 255) || (i == EVT_BTN_MODE && BTN_MODE == 255)) continue;
       button[i].attachClick(btnClickCb, (void*)i);
@@ -482,6 +498,9 @@ void Controls::controlsEvent(bool toRight, int8_t volDelta) {
     }
   }
   if (display.mode() == STATIONS) {
+    static unsigned long lastStep = 0;
+    if (millis() - lastStep < 80) return;   // PATCH PigTeam : 1 cran = 1 station
+    lastStep = millis();
     display.resetQueue();
     int p = toRight ? display.currentPlItem + 1 : display.currentPlItem - 1;
     uint16_t cs = utility.playlistLength();
@@ -510,10 +529,20 @@ void Controls::onBtnClick(int id) {
           display.putRequest(NEWMODE, PLAYER);
         }
         if (display.mode() == VOL) {
+          #ifdef ENC_CLICK_OPENS_LIST
+            // PATCH PigTeam : clic du rotatif juste apres un reglage de volume = ouvre direct la liste
+            if (btnid == EVT_ENC_SW) { display.putRequest(NEWMODE, STATIONS); break; }
+          #endif
           display.putRequest(NEWMODE, PLAYER);
         }
         if (display.mode() == PLAYER) {
-          player.toggle();
+          #ifdef ENC_CLICK_OPENS_LIST
+            // PATCH PigTeam : clic du rotatif = ouvre la liste des stations
+            if (btnid == EVT_ENC_SW) display.putRequest(NEWMODE, STATIONS);
+            else player.toggle();
+          #else
+            player.toggle();
+          #endif
         }
         if (display.mode() == STATIONS) {
           display.putRequest(NEWMODE, PLAYER);
@@ -591,6 +620,14 @@ void Controls::onBtnDoubleClick(int id) {
       }
     case EVT_BTN_PLAY:
     case EVT_ENC_SW: {
+        #ifdef ENC_CLICK_OPENS_LIST
+          // PATCH PigTeam : double-clic du rotatif = lecture / arret
+          if ((controlEvt_e)id == EVT_ENC_SW) {
+            if (network.status != CONNECTED && network.status != SDOFFLINE) return;
+            if (display.mode() == PLAYER || display.mode() == VOL) player.toggle();
+            break;
+          }
+        #endif
         onBtnClick(EVT_BTN_MODE);
         break;
       }
