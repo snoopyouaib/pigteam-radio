@@ -64,7 +64,9 @@
 #endif
 
 /*--- BOOTLOGO ---*/
-#if DSP_HEIGHT >= 320 && defined(BIG_BOOT_LOGO) && BIG_BOOT_LOGO
+#if defined(PIGTEAM_LOGO) && DSP_HEIGHT >= 176   // PATCH PigTeam : logo Fairy Pig 112x84
+  #include "bootlogo/pigteam.h"
+#elif DSP_HEIGHT >= 320 && defined(BIG_BOOT_LOGO) && BIG_BOOT_LOGO
   #include "bootlogo/198x128.h"
 #elif DSP_HEIGHT >= 176           // 480x320, 320x240, 240x240, 220x176
   #include "bootlogo/99x64.h"

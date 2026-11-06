@@ -47,10 +47,11 @@
 /* ------------------------------------------------------------------
    Env ehradio_s3_tiny_tft : ESP32-S3-Tiny N8R8 (8 Mo flash, 8 Mo PSRAM octale)
    soude sur le module TFT ST7789 320x240 (montage final du chrono piste TFT).
-   On reprend le cablage du chrono ; GPS (5/6) et SD (7-10) ne servent pas ici.
+   On reprend le cablage du chrono ; le GPS (5/6) ne sert pas ici, la SD (7-10) oui.
      TFT       : SCLK 11, MOSI 12, RST 13, DC 14, CS 15, BL 16 (pas de MISO)
      Encodeur  : CLK 17, DT 18, PUSH 44 (RX)      BACK : 43 (TX)
      Batterie  : GPIO 1 (pont 10k/10k)
+     Carte SD  : CS 10, MOSI 7, MISO 8, SCK 9 (bus SPI B, separe de l'ecran)
      PCM5102   : DIN -> 4, BCK -> 5, LCK -> 6  (GPIO 2 et 3 restent libres)
      Debrancher le GPS des GPIO 5/6 avant de brancher le DAC.
    PSRAM octale : GPIO 33-37 interdits (non exposes sur cette carte).
@@ -83,6 +84,13 @@
   #define I2S_BCLK      5             /* PCM5102 BCK */
   #define I2S_LRC       6             /* PCM5102 LCK */
   #define VS1053_CS     255
+
+  /* Carte SD (FAT32) sur son propre bus SPI B : lecture de MP3 hors Wi-Fi */
+  #define SPIB_SCK      9
+  #define SPIB_MISO     8
+  #define SPIB_MOSI     7
+  #define SD_SPI        'B'
+  #define SD_CS         10
 #else
 /* ------------------------------------------------------------------
    Env ehradio_s3_n16r8 : ESP32-S3 N16R8 + PCM5102 (I2S)
@@ -127,7 +135,9 @@
 /* Police de l'horloge : YO_MONO = 7 segments fins facon yoRadio.
    Autres choix : CHUNKY6_PX (gros pixels, defaut) ou CHUNKY6.
    CLOCKGLOW = fond "afficheur allume" derriere les chiffres. */
+#define PIGTEAM_LOGO
 #define CLOCKFONT YO_MONO
 #define CLOCKGLOW true
+#define SCROLLTIME 30   /* ms par pas : 20 = defaut (100 px/s), 30 = ~67 px/s, 40 = 50 px/s */
 
 #endif

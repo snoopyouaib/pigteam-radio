@@ -189,7 +189,11 @@ void Display::_bootScreen() {
   _bootstring->setText(buf);
   _pager->addPage(_boot);
   _pager->setPage(_boot, true);
-  dsp.drawLogo(BOOTLOGOTOP);
+  #ifdef LOGO_TOP
+    dsp.drawLogo(LOGO_TOP);   // PATCH PigTeam : position du logo PigTeam
+  #else
+    dsp.drawLogo(BOOTLOGOTOP);
+  #endif
   _bootStep = 1;
 }
 
