@@ -226,9 +226,19 @@ void AudioHandlers::handleShowStation(const char* info) {
   }
 }
 
+// PATCH PigTeam : titres bidons (uniquement chiffres, espaces et tirets), ex. "999999" ou "2045 - 2045"
+static bool isNumericJunk(const char* s) {
+  bool digit = false;
+  for (; *s; ++s) {
+    if (*s >= '0' && *s <= '9') digit = true;
+    else if (*s != ' ' && *s != '-') return false;
+  }
+  return digit;
+}
+
 void AudioHandlers::handleShowStreamTitle(const char* info) {
   if (handleAccountError(info)) return;  // error handled, don't display raw HTTP response as title
-  bool printable = isPrintable(info) && (strlen(info) > 0);
+  bool printable = isPrintable(info) && (strlen(info) > 0) && !isNumericJunk(info);  // PATCH PigTeam
   #ifdef DEBUG_TITLES
     config.setTitle(DEBUG_TITLES);
   #else
