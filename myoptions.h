@@ -3,7 +3,7 @@
 
 /* ------------------------------------------------------------------
    ehRadio - PigTeam - 3 cartes, choisies par l'environnement PlatformIO :
-     ehradio_s3_n16r8      : ESP32-S3 N16R8 + ILI9341 tactile (ou OLED) + PCM5102
+     ehradio_s3_n16r8      : ESP32-S3 N16R8 + ecran au choix (voir ECRAN) + PCM5102
      ehradio_s3_zero       : ESP32-S3-Zero 4 Mo + OLED 1,3" + rotatif + 2 boutons
      ehradio_s3_tiny_tft   : ESP32-S3-Tiny N8R8 + TFT ST7789 + rotatif + BACK
 
@@ -96,13 +96,23 @@
    Env ehradio_s3_n16r8 : ESP32-S3 N16R8 + PCM5102 (I2S)
    Rappel N16R8 : GPIO 35, 36, 37 interdits (PSRAM octal), 26-32 reserves.
 
-   CHOIX DE L'ECRAN (un seul a la fois) :
-     1 = petit OLED 1,3" I2C (SH1106, 128x64), sans tactile
+   CHOIX DE L'ECRAN (un seul a la fois) - change juste ECRAN :
      0 = TFT ILI9341 240x320 SPI + tactile XPT2046
-   ------------------------------------------------------------------ */
-  #define ECRAN_OLED 0
+     1 = petit OLED 1,3" I2C (SH1106, 128x64), sans tactile
+     2 = TFT 4" 480x320 ST7796S + tactile XPT2046      (1er essai)
+     3 = TFT 4" 480x320 ILI9488 + tactile XPT2046      (si le 2 donne un ecran blanc/brouille)
 
-  #if ECRAN_OLED
+   Pour les choix 0, 2 et 3 : meme cablage SPI (bus A) :
+     SCK + T_CLK -> GPIO 12     SDI (MOSI) + T_DIN -> GPIO 11
+     SDO (MISO) + T_DO -> GPIO 13
+     CS -> GPIO 10   DC -> GPIO 9   RESET -> GPIO 8   T_CS -> GPIO 14
+     LED -> 3,3 V (ou 5 V si trop sombre)   T_IRQ non branche
+   ILI9488 (choix 3) : si l'ecran ou le tactile deraille, DEBRANCHER la broche
+   SDO du module (garder T_DO sur GPIO 13).
+   ------------------------------------------------------------------ */
+  #define ECRAN 3
+
+  #if ECRAN == 1
     /* OLED 1,3" I2C : SDA -> GPIO 4, SCL -> GPIO 5, VCC 3,3 V, GND.
        Si l'image est decalee ou brouillee, essaie DSP_SSD1306 a la place.
        Adresse I2C 0x3C par defaut ; si l'ecran reste noir, certains modules
@@ -111,15 +121,30 @@
     #define I2C_SDA       4
     #define I2C_SCL       5
   #else
-    /* TFT ILI9341 + tactile XPT2046 (bus SPI A : SCK=12, MISO=13, MOSI=11) */
-    #define DSP_MODEL     DSP_ILI9341
-    #define SPIA_DEFAULT
+    #if ECRAN == 2
+      #define DSP_MODEL   DSP_ST7796     /* 480x320 ; si couleurs inversees : #define DSP_INVERT_QUIRK true */
+    #elif ECRAN == 3
+      #define DSP_MODEL   DSP_ILI9488    /* 480x320 ; playlist en pages (ecran lent) */
+    #else
+      #define DSP_MODEL   DSP_ILI9341    /* 320x240 */
+    #endif
+    #define SPIA_DEFAULT                 /* bus A : SCK=12, MISO=13, MOSI=11 */
     #define TFT_CS        10
     #define TFT_DC         9
     #define TFT_RST        8
     #define TS_MODEL      TS_MODEL_XPT2046
     #define TS_SPI        'A'
     #define TS_CS         14
+
+    /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny) :
+         SD_SCK  -> GPIO 18     SD_MOSI -> GPIO 47
+         SD_MISO -> GPIO 21     SD_CS   -> GPIO 2
+       (evite 26-37 PSRAM/flash, 19/20 USB, 0/3/45/46 strapping, 38/48 LED RGB de la carte) */
+    #define SPIB_SCK      18
+    #define SPIB_MISO     21
+    #define SPIB_MOSI     47
+    #define SD_SPI        'B'
+    #define SD_CS         2
   #endif
 
   /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
@@ -132,12 +157,36 @@
 /* Recherche Radio-Browser : tampon de telechargement 32 Ko (PSRAM). */
 #define SEARCHRESULTS_BUFFER 32
 
+/* Logo de demarrage PigTeam (rond) sur les ecrans >= 176 px de haut. */
+#define PIGTEAM_LOGO
+
 /* Police de l'horloge : YO_MONO = 7 segments fins facon yoRadio.
    Autres choix : CHUNKY6_PX (gros pixels, defaut) ou CHUNKY6.
    CLOCKGLOW = fond "afficheur allume" derriere les chiffres. */
-#define PIGTEAM_LOGO
 #define CLOCKFONT YO_MONO
 #define CLOCKGLOW true
 #define SCROLLTIME 30   /* ms par pas : 20 = defaut (100 px/s), 30 = ~67 px/s, 40 = 50 px/s */
+
+/* ------------------------------------------------------------------
+   Valeurs par defaut d'une carte neuve (NVS vide) ou apres un clic sur
+   "Defaut" dans une section du WebUI. Une carte deja configuree garde ses
+   reglages actuels. La cle meteo n'est jamais reinitialisee.
+   ------------------------------------------------------------------ */
+#define DSP_LOCALE        "fr_FR"
+#define WEBUI_LOCALE      "fr_FR"
+#define TIMEZONE_NAME     "Europe/Paris"
+#define TIMEZONE_POSIX    "CET-1CEST,M3.5.0,M10.5.0/3"
+#define WEATHER_LANG_OWM  "fr"
+#define WEATHER_LAT       "49.9229"   /* Dieppe : point decimal, 4 decimales max */
+#define WEATHER_LON       "1.0775"
+#define ROTARY_ACCEL      3           /* acceleration du volume, 0 a 7 */
+#define SCREEN_BRIGHTNESS 100         /* 1 a 100 : mets la valeur que tu utilises */
+
+/* Ecran retourne de 180 deg (SD du module accessible). Le tactile se retourne aussi :
+   garde les deux a true, puis ajuste TOUCH_FLIP selon le test (glissement droite = volume +).
+   Ces valeurs ne servent qu'a une carte neuve (NVS vide) ou apres "Defaut" ;
+   sur ta carte, les cases "Inverser l'ecran" / "Inverser tactile" du WebUI priment. */
+#define SCREEN_FLIP true
+#define TOUCH_FLIP  true
 
 #endif
