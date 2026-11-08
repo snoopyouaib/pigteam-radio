@@ -105,7 +105,7 @@
    Pour les choix 0, 2 et 3 : meme cablage SPI (bus A) :
      SCK + T_CLK -> GPIO 12     SDI (MOSI) + T_DIN -> GPIO 11
      SDO (MISO) + T_DO -> GPIO 13
-     CS -> GPIO 10   DC -> GPIO 9   RESET -> GPIO 8   T_CS -> GPIO 14
+     CS -> GPIO 10   DC -> GPIO 9   RESET -> GPIO 3   T_CS -> GPIO 14
      LED -> 3,3 V (ou 5 V si trop sombre)   T_IRQ non branche
    ILI9488 (choix 3) : si l'ecran ou le tactile deraille, DEBRANCHER la broche
    SDO du module (garder T_DO sur GPIO 13).
@@ -131,20 +131,21 @@
     #define SPIA_DEFAULT                 /* bus A : SCK=12, MISO=13, MOSI=11 */
     #define TFT_CS        10
     #define TFT_DC         9
-    #define TFT_RST        8
+    #define TFT_RST        3
     #define TS_MODEL      TS_MODEL_XPT2046
     #define TS_SPI        'A'
     #define TS_CS         14
 
-    /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny) :
-         SD_SCK  -> GPIO 18     SD_MOSI -> GPIO 47
-         SD_MISO -> GPIO 21     SD_CS   -> GPIO 17
-       (evite 26-37 PSRAM/flash, 19/20 USB, 0/3/45/46 strapping, 38/48 LED RGB de la carte) */
-    #define SPIB_SCK      18
+    /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny), cote droit :
+         SD_SCK  -> GPIO 48     SD_MOSI -> GPIO 47
+         SD_MISO -> GPIO 21     SD_CS   -> GPIO 2
+       (evite 26-37 PSRAM/flash, 19/20 USB, 0/45/46 strapping ; GPIO 48 = LED RGB sur
+        certaines versions de la carte : elle clignote avec l'horloge SD, sans danger) */
+    #define SPIB_SCK      48
     #define SPIB_MISO     21
     #define SPIB_MOSI     47
     #define SD_SPI        'B'
-    #define SD_CS         17
+    #define SD_CS         2
   #endif
 
   /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
@@ -157,6 +158,8 @@
 
 /* Recherche Radio-Browser : tampon de telechargement 32 Ko (PSRAM). */
 #define SEARCHRESULTS_BUFFER 32
+/* Ne pas envoyer les "clics" d'ecoute a Radio-Browser (coupe les [RB Click] du log) */
+#define RADIO_BROWSER_NO_SEND_CLICKS
 
 /* Logo de demarrage PigTeam (rond) sur les ecrans >= 176 px de haut. */
 #define PIGTEAM_LOGO
@@ -190,12 +193,13 @@
 #define SCREEN_FLIP true
 #define TOUCH_FLIP  true
 
-/* Reglage du tactile resistif : seuil de reconnaissance du sens du geste (defaut 20 px).
-   Plus grand = il faut glisser plus loin avant que le sens (volume = horizontal,
-   station = vertical) soit decide, donc moins de confusion station -> volume.
-   Si les glissements deviennent trop longs : 30. Si ca confond encore : 50. */
-#define TS_SWIPE_THRESHOLD_PX 15   /* au lieu de 40 : un petit glissement reste un glissement */
-#define TS_DOUBLETAP_MS       250  /* au lieu de 400 : deux touchers doivent etre plus rapproches pour compter */
-#define TS_LONGPRESS_MS 1500
+/* Reglages du tactile resistif (XPT2046) :
+   - TS_SWIPE_THRESHOLD_PX : deplacement minimal (px) avant que le sens du geste soit decide
+     (volume = horizontal, stations = vertical). Defaut 20. Plus petit = un petit glissement
+     reste un glissement (15 retenu) ; plus grand = moins de confusion volume / station.
+   - TS_LONGPRESS_MS : appui long immobile = bascule radio <-> SD (patch touchscreen.cpp).
+     Le toucher simple = lecture / arret, le double-tap n'existe plus. */
+#define TS_SWIPE_THRESHOLD_PX 15
+#define TS_LONGPRESS_MS       1500
 
 #endif
