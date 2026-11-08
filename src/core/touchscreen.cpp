@@ -41,6 +41,9 @@
 #ifndef TS_DOUBLETAP_MS
   #define TS_DOUBLETAP_MS        400
 #endif
+#ifndef TS_LONGPRESS_MS
+  #define TS_LONGPRESS_MS        1200  // PigTeam : appui long immobile = bascule radio <-> SD
+#endif
 
 #if TS_MODEL==TS_MODEL_XPT2046
   #include <XPT2046_Touchscreen.h>
@@ -151,12 +154,8 @@ void TouchScreen::loop() {
     touchY = p.y;
   #endif
   if (!wastouched) { /*     START TOUCH     */
-      if (_tapPending && (millis() - _tapPendingTime < TS_DOUBLETAP_MS)) {
-        _isDoubleTap = true;
-        _tapPending = false;
-      } else {
-        _tapPending = false;
-      }
+      _tapPending = false;   // PigTeam : plus de double-tap (bascule SD = appui long)
+      _isDoubleTap = false;
       _oldTouchX = touchX;
       _oldTouchY = touchY;
       touchVol = touchX;
@@ -170,6 +169,10 @@ void TouchScreen::loop() {
           _tapPending = false;
           _isDoubleTap = false;
         }
+      }
+      if (direct == TSD_REQUEST && (millis() - touchLongPress >= TS_LONGPRESS_MS)) {
+        controls.onBtnClick(EVT_BTN_MODE);   // radio <-> SD
+        direct = TSD_STAY;                   // ignore la suite du geste et le relachement
       }
       if (direct == TSD_REQUEST && (millis() - touchLongPress >= TS_DEEPSLEEP_MS)) {
         if (network.status != SDOFFLINE) {
@@ -195,9 +198,13 @@ void TouchScreen::loop() {
         case TSD_UP:
         case TSD_DOWN: {
             touchLongPress=millis();
-            if (display.mode()==PLAYER || display.mode()==STATIONS) {
-              int16_t yDelta = map(abs(touchStation - touchY), 0, _height, 0, TS_STEPS);
+            if (display.mode()==PLAYER) {
+              // PigTeam : attendre que l'affichage soit vraiment passe en STATIONS avant de
+              // bouger la liste (sinon controlsEvent voit encore le mode PLAYER = pas de volume)
               display.putRequest(NEWMODE, STATIONS);
+              touchStation = touchY;
+            } else if (display.mode()==STATIONS) {
+              int16_t yDelta = map(abs(touchStation - touchY), 0, _height, 0, TS_STEPS);
               if (yDelta>1) {
                 controls.controlsEvent((touchStation - touchY)<0);
                 touchStation = touchY;
@@ -221,13 +228,7 @@ void TouchScreen::loop() {
             utility.doSleepW();
           #endif
         } else if (pressTicks > 50) {
-          if (_isDoubleTap) {
-            controls.onBtnClick(EVT_BTN_MODE);
-            _isDoubleTap = false;
-          } else {
-            _tapPending = true;
-            _tapPendingTime = millis();
-          }
+          controls.onBtnClick(EVT_BTN_PLAY);   // PigTeam : toucher simple = lecture / arret, sans delai
         }
       }
       direct = TSD_STAY;

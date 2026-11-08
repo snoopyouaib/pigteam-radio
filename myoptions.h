@@ -190,4 +190,12 @@
 #define SCREEN_FLIP true
 #define TOUCH_FLIP  true
 
+/* Reglage du tactile resistif : seuil de reconnaissance du sens du geste (defaut 20 px).
+   Plus grand = il faut glisser plus loin avant que le sens (volume = horizontal,
+   station = vertical) soit decide, donc moins de confusion station -> volume.
+   Si les glissements deviennent trop longs : 30. Si ca confond encore : 50. */
+#define TS_SWIPE_THRESHOLD_PX 15   /* au lieu de 40 : un petit glissement reste un glissement */
+#define TS_DOUBLETAP_MS       250  /* au lieu de 400 : deux touchers doivent etre plus rapproches pour compter */
+#define TS_LONGPRESS_MS 1500
+
 #endif
