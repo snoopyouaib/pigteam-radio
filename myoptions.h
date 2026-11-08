@@ -138,19 +138,20 @@
 
     /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny) :
          SD_SCK  -> GPIO 18     SD_MOSI -> GPIO 47
-         SD_MISO -> GPIO 21     SD_CS   -> GPIO 2
+         SD_MISO -> GPIO 21     SD_CS   -> GPIO 17
        (evite 26-37 PSRAM/flash, 19/20 USB, 0/3/45/46 strapping, 38/48 LED RGB de la carte) */
     #define SPIB_SCK      18
     #define SPIB_MISO     21
     #define SPIB_MOSI     47
     #define SD_SPI        'B'
-    #define SD_CS         2
+    #define SD_CS         17
   #endif
 
   /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
-  #define I2S_DOUT      16   /* PCM5102 DIN */
-  #define I2S_BCLK      17   /* PCM5102 BCK */
-  #define I2S_LRC       15   /* PCM5102 LCK (LRCK / WS) */
+  /* I2S cote droit de la carte (loin du SPI ecran, cote gauche) : 42, 41, 40 se suivent */
+  #define I2S_DOUT      42   /* PCM5102 DIN */
+  #define I2S_BCLK      41   /* PCM5102 BCK */
+  #define I2S_LRC       40   /* PCM5102 LCK (LRCK / WS) */
   #define VS1053_CS     255  /* 255 = VS1053 non utilise */
 #endif
 
