@@ -2,8 +2,9 @@
 #define myoptions_h
 
 /* ------------------------------------------------------------------
-   ehRadio - PigTeam - 3 cartes, choisies par l'environnement PlatformIO :
+   ehRadio - PigTeam - 4 cartes, choisies par l'environnement PlatformIO :
      ehradio_s3_n16r8      : ESP32-S3 N16R8 + ecran au choix (voir ECRAN) + PCM5102
+     ehradio_s3_zero_tft   : ESP32-S3-Zero N8R8 + ILI9488 480x320 tactile + SD + PCM5102
      ehradio_s3_zero       : ESP32-S3-Zero 4 Mo + OLED 1,3" + rotatif + 2 boutons
      ehradio_s3_tiny_tft   : ESP32-S3-Tiny N8R8 + TFT ST7789 + rotatif + BACK
 
@@ -14,7 +15,49 @@
      bouton lecture : clic = lecture / arret (en liste : valide et sort), appui long = liste <-> lecteur
    ------------------------------------------------------------------ */
 
-#ifdef CARTE_ZERO
+#ifdef CARTE_ZERO_TFT
+/* ------------------------------------------------------------------
+   Env ehradio_s3_zero_tft : Waveshare ESP32-S3-Zero-N8R8 (8 Mo flash, 8 Mo PSRAM
+   octale) + ecran 4" 480x320 ILI9488 + tactile XPT2046 + SD + PCM5102.
+   Seules les broches des trous sont utilisees (pas les pastilles) :
+   GPIO 1 a 13 + TX (43) + RX (44). Console serie via l'USB natif.
+
+     Droite  : GP13 T_DO (MISO tactile)   GP12 SCK + T_CLK    GP11 SDI (MOSI) + T_DIN
+               GP10 CS ecran              GP9  DC             GP8  RESET
+               GP7  T_CS (tactile)        (SDO de l'ecran NON branche, T_IRQ non branche)
+     Gauche  : GP1  SD_SCK    GP2  SD_MOSI    GP3  SD_CS
+               GP4  PCM5102 DIN    GP5  PCM5102 BCK    GP6  PCM5102 LCK
+     Haut    : TX (43)  LED du retroeclairage (PWM, transistor Q1 du module)
+               RX (44)  SD_MISO
+   Evites : 0 / 45 / 46 (strapping), 19 / 20 (USB natif), 33-37 (PSRAM octale).
+   ------------------------------------------------------------------ */
+  #define DSP_MODEL     DSP_ILI9488   /* 480x320 ; playlist en pages (ecran lent) */
+  #define SPIA_SCK      12
+  #define SPIA_MOSI     11
+  #define SPIA_MISO     13            /* MISO du tactile (T_DO) */
+  #define TFT_CS        10
+  #define TFT_DC         9
+  #define TFT_RST        8
+  #define TS_MODEL      TS_MODEL_XPT2046
+  #define TS_SPI        'A'
+  #define TS_CS          7
+
+  /* Retroeclairage reglable : broche LED du module -> TX (43), commande le transistor Q1 */
+  #define BRIGHTNESS_PIN        43
+  #define DSP_DIMMING_ENABLED   true
+
+  /* Carte SD du module ecran (FAT32) sur son propre bus SPI B */
+  #define SPIB_SCK      1
+  #define SPIB_MOSI     2
+  #define SPIB_MISO     44
+  #define SD_SPI        'B'
+  #define SD_CS         3
+
+  #define I2S_DOUT      4             /* PCM5102 DIN */
+  #define I2S_BCLK      5             /* PCM5102 BCK */
+  #define I2S_LRC       6             /* PCM5102 LCK */
+  #define VS1053_CS     255
+#elif defined(CARTE_ZERO)
 /* ------------------------------------------------------------------
    Env ehradio_s3_zero : ESP32-S3-Zero (4 Mo flash, 2 Mo PSRAM) soudee sur le
    module OLED 1,3" + encodeur EC11 + 2 boutons (celui du chrono piste).
