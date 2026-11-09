@@ -98,6 +98,28 @@ bool CommandHandler::exec(const char *command, const char *value, uint8_t cid, C
       return true;
     }
   #endif // DEEP_SLEEP_DISABLE
+  #ifdef SLEEP_TIMER_ENABLE
+    if (cmdIs(command, "sleeptimer")) {
+      int m = atoi(value);
+      if (m < 0 || m > 720) return false;
+      player.startSleepTimer(static_cast<uint16_t>(m)); // 0 = annule
+      return true;
+    }
+  #endif
+  #ifdef ALARM_ENABLE
+    if (cmdIs(command, "alarmon"))      { config.saveValue(&config.store.alarmon, static_cast<bool>(atoi(value))); netserver.requestOnChange(ALARM, 0); return true; }
+    if (cmdIs(command, "alarmtime")) {
+      int h = 0, m = 0;
+      if (sscanf(value, "%d:%d", &h, &m) != 2 || h < 0 || h > 23 || m < 0 || m > 59) return false;
+      config.saveValue(&config.store.alarmhour, static_cast<uint8_t>(h));
+      config.saveValue(&config.store.alarmmin, static_cast<uint8_t>(m));
+      netserver.requestOnChange(ALARM, 0);
+      return true;
+    }
+    if (cmdIs(command, "alarmdays"))    { config.saveValue(&config.store.alarmdays, static_cast<uint8_t>(constrain(atoi(value), 0, 127))); netserver.requestOnChange(ALARM, 0); return true; }
+    if (cmdIs(command, "alarmstation")) { config.saveValue(&config.store.alarmstation, static_cast<uint16_t>(constrain(atoi(value), 0, 65000))); netserver.requestOnChange(ALARM, 0); return true; }
+    if (cmdIs(command, "alarmvol"))     { config.saveValue(&config.store.alarmvol, static_cast<uint8_t>(constrain(atoi(value), 0, VOLUME_SCALE))); netserver.requestOnChange(ALARM, 0); return true; }
+  #endif
   if (cmdIs(command, "mode"))            { cancelStreamRetry(); config.changeMode(atoi(value)); return true; }
   if (cmdIs(command, "submitplaylist"))  { cancelStreamRetry(); player.sendCommand({PR_STOP, 0}); return true; }
   if (cmdIs(command, "submitplaylistdone")) {

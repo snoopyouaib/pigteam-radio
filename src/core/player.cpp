@@ -109,6 +109,9 @@ void Player::setError(const char *e) {
 
 void Player::_stop(bool alreadyStopped) {
   log_i("%s called", __func__);
+  #ifdef ALARM_ENABLE
+    _alarmRamp = false;
+  #endif
   if (config.getMode()==PM_SDCARD && !alreadyStopped) config.sdResumePos = player.getFilePos();
   _status = STOPPED;
   _playingStationId = 0;
@@ -162,6 +165,9 @@ void Player::loop() {
         break;
       }
       case PR_VOL: {
+        #ifdef ALARM_ENABLE
+          _alarmRamp = false; // un reglage de volume manuel interrompt la montee progressive du reveil
+        #endif
         config.setVolume(requestP.payload);
         config.saveValueButWait(&config.store.volume, (uint8_t)requestP.payload, 3000);
         uint8_t i2sVol = volToI2S(requestP.payload);
@@ -207,6 +213,12 @@ void Player::loop() {
     _stop(true);
   }
   if (strlen(burl) > 0) browseUrl();
+  #ifdef SLEEP_TIMER_ENABLE
+    _sleepTick();
+  #endif
+  #ifdef ALARM_ENABLE
+    _alarmTick();
+  #endif
 }
 
 bool Player::queueResolvedUrl(const char* url) {
@@ -451,9 +463,136 @@ uint8_t Player::volToI2S(uint8_t volume) {
 }
 
 void Player::_loadVol(uint8_t volume) {
+  #ifdef ALARM_ENABLE
+    if (_alarmRamp) return; // montee progressive du reveil en cours : le volume est pilote par _alarmTick
+  #endif
   setVolume(volToI2S(volume));
 }
 
 void Player::setVol(uint8_t volume) {
   player.sendCommand({PR_VOL, volume});
 }
+
+#if defined(SLEEP_TIMER_ENABLE) || defined(ALARM_ENABLE)
+void Player::_applyI2SVolume(uint8_t i2sVol) {
+  Audio::setVolume(i2sVol);
+  #ifdef USE_ES8311
+    es.setVolume((uint8_t)map(i2sVol, 0, VOLUME_SCALE, 0, 100));
+  #endif
+}
+#endif
+
+#ifdef SLEEP_TIMER_ENABLE
+void Player::startSleepTimer(uint16_t minutes) {
+  if (minutes == 0) { cancelSleepTimer(); return; }
+  _sleepMinutes = minutes;
+  _sleepEndMs = millis() + (uint32_t)minutes * 60000UL;
+  _sleepLastVol = -1;
+  _sleepActive = true;
+  FUNCTIONLOG("SleepTimer", "Arret programme dans %u min", minutes);
+  char msg[32];
+  snprintf(msg, sizeof(msg), "Arret dans %u min", minutes);
+  config.setTitle(msg);
+  netserver.requestOnChange(SLEEPTIMER, 0);
+}
+
+void Player::cancelSleepTimer() {
+  bool wasActive = _sleepActive;
+  _sleepActive = false;
+  _sleepMinutes = 0;
+  if (wasActive) {
+    if (_sleepLastVol >= 0) _applyI2SVolume(volToI2S(config.store.volume)); // fondu en cours : on rend le volume
+    _sleepLastVol = -1;
+    FUNCTIONLOG("SleepTimer", "Arret programme annule");
+    netserver.requestOnChange(SLEEPTIMER, 0);
+  }
+}
+
+uint32_t Player::sleepRemaining() {
+  if (!_sleepActive) return 0;
+  int32_t left = (int32_t)(_sleepEndMs - millis());
+  return left > 0 ? (uint32_t)(left / 1000) : 0;
+}
+
+void Player::_sleepTick() {
+  if (!_sleepActive) return;
+  int32_t left = (int32_t)(_sleepEndMs - millis()); // ms, valable meme apres debordement de millis()
+  if (left <= 0) {
+    _sleepActive = false;
+    _sleepMinutes = 0;
+    _sleepLastVol = -1;
+    FUNCTIONLOG("SleepTimer", "Fin du compte a rebours : arret");
+    if (_status == PLAYING || isRunning()) _stop();
+    _applyI2SVolume(volToI2S(config.store.volume)); // volume normal pour la prochaine lecture
+    netserver.requestOnChange(SLEEPTIMER, 0);
+    return;
+  }
+  if ((uint32_t)left < SLEEP_FADE_MS && isRunning()) {
+    uint8_t base = volToI2S(config.store.volume);
+    uint8_t v = (uint8_t)(((uint32_t)base * (uint32_t)left) / SLEEP_FADE_MS);
+    if (v != _sleepLastVol) { _sleepLastVol = v; _applyI2SVolume(v); }
+  }
+}
+#endif // SLEEP_TIMER_ENABLE
+
+#ifdef ALARM_ENABLE
+void Player::_alarmFire() {
+  FUNCTIONLOG("Alarm", "Reveil declenche");
+  #ifdef SLEEP_TIMER_ENABLE
+    cancelSleepTimer();
+  #endif
+  // on rallume l'ecran et on sort de l'economiseur
+  config.setDspOn(true);
+  backlightControls.restart();
+  config.screensaverTicks = 0;
+  config.screensaverPlayingTicks = 0;
+  display.putRequest(NEWMODE, PLAYER);
+  if (_status == PLAYING || isRunning()) return; // deja en lecture : on ne touche a rien
+  if (config.getMode() != PM_WEB) config.changeMode(PM_WEB);
+  FUNCTIONLOG("Alarm", "Montee du volume : station %u, volume final %u", (unsigned)config.store.alarmstation, (unsigned)config.store.alarmvol);
+  _alarmRamp = true;
+  _alarmRampStart = millis();
+  _alarmLastCheck = 0;
+  _applyI2SVolume(0);
+  uint16_t id = config.store.alarmstation;
+  if (id > utility.playlistLength()) id = 0; // station disparue de la liste : derniere station
+  if (id > 0) {
+    sendCommand({PR_PLAY, id});
+  } else if (!resumeLastWebSource()) {
+    sendCommand({PR_PLAY, config.lastStation()});
+  }
+}
+
+void Player::_alarmTick() {
+  uint32_t now = millis();
+  if (_alarmRamp) {
+    if (now - _alarmLastCheck < 100) return;
+    _alarmLastCheck = now;
+    uint32_t el = now - _alarmRampStart;
+    if (el >= ALARM_RAMP_MS) {
+      _alarmRamp = false;
+      FUNCTIONLOG("Alarm", "Fin de la montee : volume %u (i2s %u)", (unsigned)config.store.alarmvol, (unsigned)volToI2S(config.store.alarmvol));
+      _applyI2SVolume(volToI2S(config.store.alarmvol)); // applique tout de suite
+      setVol(config.store.alarmvol); // puis passe par PR_VOL (enregistre et met l'interface a jour)
+    } else {
+      uint8_t target = volToI2S(config.store.alarmvol);
+      uint8_t v = (uint8_t)(((uint32_t)target * el) / ALARM_RAMP_MS);
+      static uint32_t lastLog = 0;
+      if (now - lastLog >= 10000) { lastLog = now; FUNCTIONLOG("Alarm", "Montee : i2s %u / %u", (unsigned)v, (unsigned)target); }
+      _applyI2SVolume(v);
+    }
+    return;
+  }
+  if (now - _alarmLastCheck < 1000) return;
+  _alarmLastCheck = now;
+  if (!config.store.alarmon) return;
+  const struct tm &t = network.timeinfo;
+  if (t.tm_year <= 100) return; // heure pas encore synchronisee
+  if (t.tm_hour != config.store.alarmhour || t.tm_min != config.store.alarmmin) return;
+  if (!((config.store.alarmdays >> t.tm_wday) & 1)) return;
+  uint32_t key = (uint32_t)t.tm_yday * 1440UL + (uint32_t)t.tm_hour * 60UL + (uint32_t)t.tm_min + 1UL;
+  if (key == _alarmLastKey) return; // deja declenche pendant cette minute
+  _alarmLastKey = key;
+  _alarmFire();
+}
+#endif // ALARM_ENABLE

@@ -861,6 +861,13 @@ const configKeyMap Config::keyMap[] = {
   CONFIG_KEY_ENTRY(mqtttopic, "mqtttopic"),
   // Battery
   CONFIG_KEY_ENTRY(battery_adc_ref_mv, "battref"),
+  // Reveil
+  CONFIG_KEY_ENTRY(alarmon, "alarmon"),
+  CONFIG_KEY_ENTRY(alarmhour, "alarmhour"),
+  CONFIG_KEY_ENTRY(alarmmin, "alarmmin"),
+  CONFIG_KEY_ENTRY(alarmdays, "alarmdays"),
+  CONFIG_KEY_ENTRY(alarmstation, "alarmsta"),
+  CONFIG_KEY_ENTRY(alarmvol, "alarmvol"),
   CONFIG_KEY_ENTRY(bootStableMarker, "bootstablemark"),
   CONFIG_KEY_ENTRY(SDoffline, "sdoffline"),
   {0, nullptr, 0} // Yup, 3 fields - don't delete the last line!

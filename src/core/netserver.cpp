@@ -577,6 +577,12 @@ void NetServer::processQueue() {
           requestOnChange(SDINIT, clientId);
           requestOnChange(GETPLAYERMODE, clientId);
           requestOnChange(GETBATTERY, clientId); 
+          #ifdef SLEEP_TIMER_ENABLE
+            requestOnChange(SLEEPTIMER, clientId);
+          #endif
+          #ifdef ALARM_ENABLE
+            requestOnChange(ALARM, clientId);
+          #endif
           if (config.getMode()==PM_SDCARD) { requestOnChange(SDPOS, clientId); requestOnChange(SDLEN, clientId); requestOnChange(SDSHUFFLE, clientId); } 
           return; 
           break;
@@ -697,6 +703,12 @@ void NetServer::processQueue() {
       case CURATED_PLAYLIST_DONE: snprintf(wsbuf, sizeof(wsbuf), "{\"curated_playlist_done\":true}"); break;
       case CURATED_FAILED: snprintf(wsbuf, sizeof(wsbuf), "{\"curated_failed\":true}"); break;
       case ARTWORK:       break;
+      #ifdef ALARM_ENABLE
+        case ALARM:         snprintf(wsbuf, sizeof(wsbuf), "{\"alarmon\":%d,\"alarmh\":%d,\"alarmm\":%d,\"alarmdays\":%d,\"alarmsta\":%d,\"alarmvol\":%d,\"alarmvolmax\":%d}", config.store.alarmon ? 1 : 0, config.store.alarmhour, config.store.alarmmin, config.store.alarmdays, config.store.alarmstation, config.store.alarmvol, VOLUME_SCALE); break;
+      #endif
+      #ifdef SLEEP_TIMER_ENABLE
+        case SLEEPTIMER:    snprintf(wsbuf, sizeof(wsbuf), "{\"sleeptimer\":%u,\"sleepleft\":%lu}", (unsigned)player.sleepMinutes(), (unsigned long)player.sleepRemaining()); break;
+      #endif
       #ifdef USE_SD
         case CHANGEMODE:    config.changeMode(config.newConfigMode); return; break;
       #endif

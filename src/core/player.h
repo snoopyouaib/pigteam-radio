@@ -21,6 +21,14 @@ struct playerRequestParams_t
 
 enum plStatus_e : uint8_t{ PLAYING = 1, STOPPED = 2 };
 
+/* Arret programme (sleep timer) : volume en fondu puis arret. Exclu de l'env Zero (flash presque plein). */
+#ifndef CARTE_ZERO
+  #define SLEEP_TIMER_ENABLE
+  #define SLEEP_FADE_MS 60000UL   // duree du fondu avant l'arret
+  #define ALARM_ENABLE            // reveil (heure, jours, station, volume progressif)
+  #define ALARM_RAMP_MS 30000UL   // duree de la montee progressive du volume
+#endif
+
 class Player: public Audio {
   public:
     volatile bool lockOutput = true;  // volatile: written from WiFi callbacks, read from audio callbacks
@@ -49,6 +57,15 @@ class Player: public Audio {
     void stepVol(bool up);
     uint8_t volToI2S(uint8_t volume);
     void setVol(uint8_t volume);
+    #if defined(SLEEP_TIMER_ENABLE) || defined(ALARM_ENABLE)
+      void _applyI2SVolume(uint8_t i2sVol);
+    #endif
+    #ifdef SLEEP_TIMER_ENABLE
+      void startSleepTimer(uint16_t minutes);   // 0 = annule
+      void cancelSleepTimer();
+      uint16_t sleepMinutes() { return _sleepActive ? _sleepMinutes : 0; }
+      uint32_t sleepRemaining();                // secondes restantes
+    #endif
 
     bool hasError() { return strlen(_plError)>0; }
     plStatus_e status() { return _status; }
@@ -62,6 +79,21 @@ class Player: public Audio {
     void _stop(bool alreadyStopped = false);
     void _play(uint16_t stationId);
     void _loadVol(uint8_t volume);
+    #ifdef SLEEP_TIMER_ENABLE
+      bool     _sleepActive = false;
+      uint16_t _sleepMinutes = 0;
+      uint32_t _sleepEndMs = 0;
+      int16_t  _sleepLastVol = -1;
+      void _sleepTick();
+    #endif
+    #ifdef ALARM_ENABLE
+      bool     _alarmRamp = false;
+      uint32_t _alarmRampStart = 0;
+      uint32_t _alarmLastKey = 0;
+      uint32_t _alarmLastCheck = 0;
+      void _alarmTick();
+      void _alarmFire();
+    #endif
 };
 
 extern Player player;

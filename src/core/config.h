@@ -179,6 +179,14 @@ struct config_t // specify defaults here (and macros in options.h) (defaults are
   // Battery
   uint16_t  battery_adc_ref_mv = BATTERY_ADC_REF_MV;
 
+  // Reveil (alarm)
+  bool      alarmon = false;
+  uint8_t   alarmhour = 7;
+  uint8_t   alarmmin = 0;
+  uint8_t   alarmdays = 0x3E;    // bit n = jour n (0 = dimanche, 1 = lundi...) ; 0x3E = lundi a vendredi
+  uint16_t  alarmstation = 0;    // 0 = derniere station ecoutee
+  uint8_t   alarmvol = SOUND_VOLUME; // volume final du reveil (atteint en fin de montee progressive)
+
   // if adding a variable, you can do it anywhere, just be sure to add it to configKeyMap() in config.cpp
   // if removing a variable and key, add to deleteOldKeys()
   // note that defaults are mostly built from macros, except a few which are disabled by default

@@ -319,7 +319,88 @@ function fillSlider(sl){
   if(slaveid) getId(slaveid).innerText=sl.value;
   sl.style.background = 'linear-gradient(to right, var(--accent-dark) 0%,  var(--accent-dark) ' + value + '%, var(--odd-bg-color) ' + value + '%, var(--odd-bg-color) 100%)';
 }
+/* Arret programme : compte a rebours local, recale a chaque message de la radio */
+var sleepEndTs = 0, sleepTick = null;
+function sleepUpdateLabel(){
+  const el = getId('sleepleft'); if(!el) return;
+  const left = Math.max(0, Math.round((sleepEndTs - Date.now())/1000));
+  if(sleepEndTs === 0){ el.innerText = ''; return; }
+  el.innerText = Math.floor(left/60) + ':' + String(left%60).padStart(2,'0');
+}
+function sleepSetCountdown(seconds){
+  if(sleepTick){ clearInterval(sleepTick); sleepTick = null; }
+  if(seconds > 0){
+    sleepEndTs = Date.now() + seconds*1000;
+    sleepTick = setInterval(sleepUpdateLabel, 1000);
+  } else {
+    sleepEndTs = 0;
+  }
+  sleepUpdateLabel();
+}
+/* Reveil : l'etat vient de la radio ({"alarmon":..,"alarmh":..}), les modifications repartent en commandes alarm* */
+var alarmState = {on:0, h:7, m:0, days:0x3E, sta:0, vol:0, volmax:42};
+function alarmPad(n){ return String(n).padStart(2,'0'); }
+function alarmRender(){
+  if(!getId('alarmon')) return;
+  getId('alarmon').checked = !!alarmState.on;
+  getId('alarmtime').value = alarmPad(alarmState.h) + ':' + alarmPad(alarmState.m);
+  for(let d=0; d<7; d++){ const c = getId('alarmday'+d); if(c) c.checked = !!((alarmState.days >> d) & 1); }
+  const v = getId('alarmvol'); v.max = alarmState.volmax; v.value = alarmState.vol;
+  getId('alarmvolinfo').innerText = alarmState.vol;
+  const s = getId('alarmstation');
+  if(s && !Array.from(s.options).some(o => o.value === String(alarmState.sta))){
+    const o = document.createElement('option'); o.value = String(alarmState.sta); o.text = 'Station ' + alarmState.sta; s.add(o);
+  }
+  if(s) s.value = String(alarmState.sta);
+  getId('alarmsummary').innerText = alarmState.on ? '(' + alarmPad(alarmState.h) + ':' + alarmPad(alarmState.m) + ')' : '';
+}
+function alarmApply(id, value){
+  const v = parseInt(value) || 0;
+  switch(id){
+    case 'alarmon': alarmState.on = v; break;
+    case 'alarmh': alarmState.h = v; break;
+    case 'alarmm': alarmState.m = v; break;
+    case 'alarmdays': alarmState.days = v; break;
+    case 'alarmsta': alarmState.sta = v; break;
+    case 'alarmvol': alarmState.vol = v; break;
+    case 'alarmvolmax': alarmState.volmax = v; break;
+  }
+  alarmRender();
+}
+function alarmFillStations(){
+  const s = getId('alarmstation'), pl = getId('playlist'); if(!s || !pl) return;
+  s.innerHTML = '<option value="0">Dernière station écoutée</option>';
+  pl.querySelectorAll('li').forEach(li => {
+    const n = li.getAttribute('attr-id');
+    const o = document.createElement('option'); o.value = n; o.text = n + ' - ' + (li.dataset.name || ''); s.add(o);
+  });
+  s.value = String(alarmState.sta);
+}
+document.addEventListener('toggle', (e) => { if(e.target && e.target.id === 'alarmwrap' && e.target.open) alarmFillStations(); }, true);
+document.addEventListener('change', (e) => {
+  const t = e.target; if(!t || !t.id || t.id.indexOf('alarm') !== 0) return;
+  if(t.id === 'alarmon') websocket.send('alarmon=' + (t.checked ? 1 : 0));
+  else if(t.id === 'alarmtime'){ if(t.value) websocket.send('alarmtime=' + t.value); }
+  else if(t.id === 'alarmstation') websocket.send('alarmstation=' + t.value);
+  else if(t.id === 'alarmvol') websocket.send('alarmvol=' + t.value);
+  else if(t.id.indexOf('alarmday') === 0){
+    let mask = 0;
+    for(let d=0; d<7; d++){ const c = getId('alarmday'+d); if(c && c.checked) mask |= (1 << d); }
+    websocket.send('alarmdays=' + mask);
+  }
+});
+document.addEventListener('input', (e) => {
+  const t = e.target; if(t && t.id === 'alarmvol') getId('alarmvolinfo').innerText = t.value;
+});
 function setupElement(id,value){
+  if(id.indexOf('alarm') === 0){ alarmApply(id, value); return; }
+  if(id === 'sleepleft'){ sleepSetCountdown(parseInt(value) || 0); return; }
+  if(id === 'sleeptimer'){
+    const sel = getId('sleeptimer');
+    if(sel && !Array.from(sel.options).some(o => o.value === String(value))){
+      const o = document.createElement('option'); o.value = String(value); o.text = 'Arrêt dans ' + value + ' min'; sel.add(o);
+    }
+  }
   // handle bitrate/codec specially
   if(id === 'fmt'){
     currentCodec = value || '';
