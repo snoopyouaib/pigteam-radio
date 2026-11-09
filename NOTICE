@@ -1,0 +1,23 @@
+pigteam-radio
+=============
+
+Ce projet est un dérivé d'ehRadio et conserve toutes les mentions de copyright
+des fichiers d'origine.
+
+Projets d'origine
+-----------------
+- ehRadio, par trip5 : https://github.com/trip5/ehRadio
+- yoRadio, par e2002 : https://github.com/e2002/yoradio
+  (et ёRadio, dont yoRadio est lui-même issu)
+
+Les bibliothèques incluses dans src/libraries/ et lib/ (audio I2S, ILI9488, ST7796S,
+FT6336, ES8311, ESPFileUpdater, etc.) conservent leur licence et leurs auteurs d'origine,
+indiqués dans leurs fichiers.
+
+Base de départ de cet historique : tag git base-ehradio-2026.08.19.
+
+Licence
+-------
+Ce programme est un logiciel libre distribué sous licence GNU GPL v3 (voir le fichier LICENSE).
+Toute redistribution du firmware ou de ses sources doit se faire sous la même licence
+et accompagner le code source correspondant.
