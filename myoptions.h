@@ -106,7 +106,8 @@
      SCK + T_CLK -> GPIO 12     SDI (MOSI) + T_DIN -> GPIO 11
      SDO (MISO) + T_DO -> GPIO 13
      CS -> GPIO 10   DC -> GPIO 9   RESET -> GPIO 3   T_CS -> GPIO 14
-     LED -> 3,3 V (ou 5 V si trop sombre)   T_IRQ non branche
+     LED -> GPIO 4 (PWM : le transistor Q1 du module pilote le retroeclairage)
+     T_IRQ non branche
    ILI9488 (choix 3) : si l'ecran ou le tactile deraille, DEBRANCHER la broche
    SDO du module (garder T_DO sur GPIO 13).
    ------------------------------------------------------------------ */
@@ -135,6 +136,10 @@
     #define TS_MODEL      TS_MODEL_XPT2046
     #define TS_SPI        'A'
     #define TS_CS         14
+
+    /* Retroeclairage reglable : broche LED du module -> GPIO 4 (commande le transistor Q1) */
+    #define BRIGHTNESS_PIN        4
+    #define DSP_DIMMING_ENABLED   true
 
     /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny), cote droit :
          SD_SCK  -> GPIO 48     SD_MOSI -> GPIO 47
