@@ -189,7 +189,7 @@
          SD_MISO -> GPIO 21     SD_CS   -> GPIO 2
        (evite 26-37 PSRAM/flash, 19/20 USB, 0/45/46 strapping ; GPIO 48 = LED RGB sur
         certaines versions de la carte : elle clignote avec l'horloge SD, sans danger) */
-    #define SPIB_SCK      48
+    #define SPIB_SCK      38
     #define SPIB_MISO     21
     #define SPIB_MOSI     47
     #define SD_SPI        'B'
