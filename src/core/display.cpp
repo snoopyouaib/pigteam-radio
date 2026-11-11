@@ -20,6 +20,8 @@
 #include "../displays/widgets/pages.h"
 #include "../displays/widgets/widgets.h"
 #include "battery.h"
+#include "slideshow.h"
+#include "touchmenu.h"
 
 extern const char batterytxtFmt[] PROGMEM;
 
@@ -644,6 +646,28 @@ void Display::loop() {
       display.invert();
     }
   }
+  #ifdef TOUCHMENU_ENABLE
+    // Menu rapide tactile : meme principe que le diaporama, la tache d'affichage lui appartient tant qu'il est ouvert
+    if (_bootStep==2 && displayQueue!=NULL && !_locked) {
+      switch (touchmenu.poll()) {
+        case TME_OPENED:  _menuBegin(); touchmenu.step(); return;
+        case TME_RUNNING: xQueueReset(displayQueue); touchmenu.step(); return;
+        case TME_CLOSED:  _menuEnd(); return;
+        default: break;
+      }
+    }
+  #endif
+  #ifdef SLIDESHOW_ENABLE
+    // Diaporama : la tache d'affichage appartient au diaporama tant qu'il tourne
+    if (_bootStep==2 && displayQueue!=NULL && !_locked) {
+      switch (slideshow.poll()) {
+        case SSE_STARTED: _slideshowBegin(); slideshow.step(); return;
+        case SSE_RUNNING: xQueueReset(displayQueue); slideshow.step(); return;   // on vide la file : tout sera redessine a la sortie
+        case SSE_STOPPED: _slideshowEnd(); return;
+        default: break;
+      }
+    }
+  #endif
   if (displayQueue==NULL || _locked) return;
   _pager->loop();
   requestParams_t request;
@@ -1100,6 +1124,53 @@ void Display::_applyState() {
   putRequest(NEWMODE, CLEAR);
   putRequest(NEWMODE, PLAYER);
 }
+
+#ifdef SLIDESHOW_ENABLE
+void Display::_slideshowBegin() {
+  bool wasBlank = (_mode == SCREENBLANK);
+  _mode = CLEAR;                       // ni economiseur, ni commandes tactiles de la radio pendant le diaporama
+  config.isScreensaver = false;
+  config.screensaverTicks = 0;
+  config.screensaverPlayingTicks = 0;
+  if (wasBlank || !config.store.dspon) config.setDspOn(true, false);
+  backlightControls.restart();
+  dsp.setScrollId(NULL);
+  dsp.fillScreen(0);
+  netserver.requestOnChange(SLIDESHOW, 0);
+}
+
+void Display::_slideshowEnd() {
+  resetQueue();
+  _station();
+  _title();
+  _mode = CLEAR;                       // force _swichMode(PLAYER) a tout redessiner
+  _swichMode(PLAYER);
+  netserver.requestOnChange(SLIDESHOW, 0);
+}
+#endif
+
+#ifdef TOUCHMENU_ENABLE
+void Display::_menuBegin() {
+  bool wasBlank = (_mode == SCREENBLANK);
+  _mode = CLEAR;                       // ni economiseur, ni commandes de la radio pendant le menu
+  config.isScreensaver = false;
+  config.screensaverTicks = 0;
+  config.screensaverPlayingTicks = 0;
+  if (wasBlank || !config.store.dspon) config.setDspOn(true, false);
+  backlightControls.restart();
+  dsp.setScrollId(NULL);
+  dsp.fillScreen(0);
+}
+
+void Display::_menuEnd() {
+  resetQueue();
+  _station();
+  _title();
+  _mode = CLEAR;                       // force _swichMode(PLAYER) a tout redessiner
+  _swichMode(PLAYER);
+  touchmenu.closedDone();              // la tache tactile peut maintenant lancer l'action choisie
+}
+#endif
 
 void Display::applyLayout(uint8_t id) {
   if (id >= layoutCount) return;

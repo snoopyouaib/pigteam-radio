@@ -14,6 +14,7 @@
 #include "config.h"
 #include "controls.h"
 #include "display.h"
+#include "slideshow.h"
 #include "logging.h"
 #include "mqtt.h"
 #include "netserver.h"
@@ -583,6 +584,9 @@ void NetServer::processQueue() {
           #ifdef ALARM_ENABLE
             requestOnChange(ALARM, clientId);
           #endif
+          #ifdef SLIDESHOW_ENABLE
+            requestOnChange(SLIDESHOW, clientId);
+          #endif
           if (config.getMode()==PM_SDCARD) { requestOnChange(SDPOS, clientId); requestOnChange(SDLEN, clientId); requestOnChange(SDSHUFFLE, clientId); } 
           return; 
           break;
@@ -705,6 +709,9 @@ void NetServer::processQueue() {
       case ARTWORK:       break;
       #ifdef ALARM_ENABLE
         case ALARM:         snprintf(wsbuf, sizeof(wsbuf), "{\"alarmon\":%d,\"alarmh\":%d,\"alarmm\":%d,\"alarmdays\":%d,\"alarmsta\":%d,\"alarmvol\":%d,\"alarmvolmax\":%d}", config.store.alarmon ? 1 : 0, config.store.alarmhour, config.store.alarmmin, config.store.alarmdays, config.store.alarmstation, config.store.alarmvol, VOLUME_SCALE); break;
+      #endif
+      #ifdef SLIDESHOW_ENABLE
+        case SLIDESHOW:     snprintf(wsbuf, sizeof(wsbuf), "{\"slideshow\":%u,\"slideshowrand\":%d}", (unsigned)slideshow.seconds(), slideshow.isRandom() ? 1 : 0); break;
       #endif
       #ifdef SLEEP_TIMER_ENABLE
         case SLEEPTIMER:    snprintf(wsbuf, sizeof(wsbuf), "{\"sleeptimer\":%u,\"sleepleft\":%lu}", (unsigned)player.sleepMinutes(), (unsigned long)player.sleepRemaining()); break;

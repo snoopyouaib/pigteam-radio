@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include "config.h"
 #include "controls.h"
+#include "slideshow.h"
+#include "touchmenu.h"
 #include "display.h"
 #include "logging.h"
 #include "network.h"
@@ -130,6 +132,9 @@ void TouchScreen::loop() {
   static tsDirection_e direct;
   static uint16_t touchVol, touchStation;
   if (!_checklpdelay(20, _touchdelay)) return;
+  #ifdef TOUCHMENU_ENABLE
+    touchmenu.runPending();   // action choisie dans le menu, lancee une fois celui-ci ferme
+  #endif
 #if TS_MODEL==TS_MODEL_GT911
   ts.read();
 #endif
@@ -153,6 +158,9 @@ void TouchScreen::loop() {
     touchX = p.x;
     touchY = p.y;
   #endif
+  #ifdef TOUCHMENU_ENABLE
+    if (touchmenu.active()) touchmenu.touchMove(touchX, touchY);
+  #endif
   if (!wastouched) { /*     START TOUCH     */
       _tapPending = false;   // PigTeam : plus de double-tap (bascule SD = appui long)
       _isDoubleTap = false;
@@ -162,6 +170,18 @@ void TouchScreen::loop() {
       touchStation = touchY;
       direct = TSD_REQUEST;
       touchLongPress=millis();
+      #ifdef TOUCHMENU_ENABLE
+        if (touchmenu.active()) {          // menu ouvert : les touchers lui appartiennent
+          touchmenu.touchBegin();
+          direct = TSD_STAY;
+        }
+      #endif
+      #ifdef SLIDESHOW_ENABLE
+        if (slideshow.active()) {          // un vrai appui arrete le diaporama (voir Slideshow::touchEnd) sans autre effet
+          slideshow.touchBegin();
+          direct = TSD_STAY;
+        }
+      #endif
     } else { /*     SWIPE TOUCH     */
       if (direct == TSD_REQUEST) {
         direct = _tsDirection(touchX, touchY);
@@ -171,7 +191,11 @@ void TouchScreen::loop() {
         }
       }
       if (direct == TSD_REQUEST && (millis() - touchLongPress >= TS_LONGPRESS_MS)) {
-        controls.onBtnClick(EVT_BTN_MODE);   // radio <-> SD
+        #ifdef TOUCHMENU_ENABLE
+          if (display.mode()==PLAYER) touchmenu.open();   // menu rapide (la bascule radio <-> SD y est)
+        #else
+          controls.onBtnClick(EVT_BTN_MODE);   // radio <-> SD
+        #endif
         direct = TSD_STAY;                   // ignore la suite du geste et le relachement
       }
       if (direct == TSD_REQUEST && (millis() - touchLongPress >= TS_DEEPSLEEP_MS)) {
@@ -198,6 +222,11 @@ void TouchScreen::loop() {
         case TSD_UP:
         case TSD_DOWN: {
             touchLongPress=millis();
+            #ifdef TOUCHMENU_ENABLE
+              // PigTeam : ancienne liste de stations au glissement vertical supprimee,
+              // la selection se fait par le menu tactile (appui long > Stations)
+              break;
+            #endif
             if (display.mode()==PLAYER) {
               // PigTeam : attendre que l'affichage soit vraiment passe en STATIONS avant de
               // bouger la liste (sinon controlsEvent voit encore le mode PLAYER = pas de volume)
@@ -221,6 +250,12 @@ void TouchScreen::loop() {
     }
   } else {
     if (wastouched) {/*     END TOUCH     */
+      #ifdef TOUCHMENU_ENABLE
+        touchmenu.touchEnd();
+      #endif
+      #ifdef SLIDESHOW_ENABLE
+        slideshow.touchEnd();
+      #endif
       if (direct == TSD_REQUEST) {
         uint32_t pressTicks = millis()-touchLongPress;
         if (pressTicks >= TS_DEEPSLEEP_MS) {

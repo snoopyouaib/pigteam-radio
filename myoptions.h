@@ -185,16 +185,24 @@
     #define DSP_DIMMING_ENABLED   true
 
     /* Carte SD du module ecran (FAT32), sur son propre bus SPI B (comme la Tiny), cote droit :
-         SD_SCK  -> GPIO 48     SD_MOSI -> GPIO 47
+         SD_SCK  -> GPIO 38     SD_MOSI -> GPIO 47
          SD_MISO -> GPIO 21     SD_CS   -> GPIO 2
-       (evite 26-37 PSRAM/flash, 19/20 USB, 0/45/46 strapping ; GPIO 48 = LED RGB sur
-        certaines versions de la carte : elle clignote avec l'horloge SD, sans danger) */
+       (evite 26-37 PSRAM/flash, 19/20 USB, 0/45/46 strapping, et le GPIO 48 = LED RGB de la
+        carte, qui clignotait avec l'horloge SD) */
     #define SPIB_SCK      38
     #define SPIB_MISO     21
     #define SPIB_MOSI     47
     #define SD_SPI        'B'
     #define SD_CS         2
   #endif
+
+  /* Diaporama de photos JPEG (dossier /photos de la SD), lance par un bouton de l'interface web.
+     Necessite la lib JPEGDEC (lib_deps de l'env) ; photos conseillees en 480x320, JPEG baseline. */
+  #define SLIDESHOW_ENABLE
+  #define SLIDESHOW_RANDOM_DEFAULT true   /* photos en ordre aleatoire par defaut (case a cocher dans l'interface web) */
+  /* Menu rapide tactile : appui long = grille de boutons (diaporama, ecran off, mode SD/radio, reveil, arret programme) */
+  #define TOUCHMENU_ENABLE
+  #define DSP_TASK_STACK_SIZE   12      /* KB : le decodage JPEG + lecture SD demandent plus de pile (defaut 8) */
 
   /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
   /* I2S cote droit de la carte (loin du SPI ecran, cote gauche) : 42, 41, 40 se suivent */

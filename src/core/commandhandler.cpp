@@ -11,6 +11,7 @@
 #include "netserver.h"
 #include "network.h"
 #include "player.h"
+#include "slideshow.h"
 #include "utility.h"
 
 CommandHandler cmd;
@@ -103,6 +104,19 @@ bool CommandHandler::exec(const char *command, const char *value, uint8_t cid, C
       int m = atoi(value);
       if (m < 0 || m > 720) return false;
       player.startSleepTimer(static_cast<uint16_t>(m)); // 0 = annule
+      return true;
+    }
+  #endif
+  #ifdef SLIDESHOW_ENABLE
+    if (cmdIs(command, "slideshow")) {   // slideshow=N : N secondes par photo ; 0 = arret
+      int sec = atoi(value);
+      if (sec < 0 || sec > 3600) return false;
+      if (sec == 0) slideshow.stop("web"); else slideshow.start(static_cast<uint16_t>(sec));
+      return true;
+    }
+    if (cmdIs(command, "slideshowrand")) {   // slideshowrand=1 : ordre aleatoire ; 0 : ordre alphabetique
+      slideshow.setRandom(atoi(value) != 0);
+      netserver.requestOnChange(SLIDESHOW, 0);
       return true;
     }
   #endif

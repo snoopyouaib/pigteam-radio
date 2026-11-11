@@ -392,7 +392,33 @@ document.addEventListener('change', (e) => {
 document.addEventListener('input', (e) => {
   const t = e.target; if(t && t.id === 'alarmvol') getId('alarmvolinfo').innerText = t.value;
 });
+/* Diaporama : l'etat vient de la radio ({"slideshow":N}, N = secondes par photo, 0 = arret) */
+var slideshowOn = 0;
+function slideshowApply(v){
+  slideshowOn = parseInt(v) || 0;
+  const w = getId('slideinfo'); if(w) w.classList.remove('hidden');
+  const b = getId('slidebtn');
+  if(b){ b.innerText = slideshowOn ? '⏹ Arrêter le diaporama' : '🖼 Diaporama'; b.classList.toggle('active', !!slideshowOn); }
+  const s = getId('slidesecs');
+  if(s && slideshowOn){
+    if(!Array.from(s.options).some(o => o.value === String(slideshowOn))){
+      const o = document.createElement('option'); o.value = String(slideshowOn); o.text = slideshowOn + ' s'; s.add(o);
+    }
+    s.value = String(slideshowOn);
+  }
+}
+document.addEventListener('click', (e) => {
+  const b = e.target && e.target.closest ? e.target.closest('#slidebtn') : null; if(!b) return;
+  if(!slideshowOn) websocket.send('slideshowrand=' + (getId('slidernd').checked ? 1 : 0));
+  websocket.send('slideshow=' + (slideshowOn ? 0 : (getId('slidesecs').value || 8)));
+});
+document.addEventListener('change', (e) => {
+  if(e.target && e.target.id === 'slidesecs' && slideshowOn) websocket.send('slideshow=' + e.target.value);
+  if(e.target && e.target.id === 'slidernd') websocket.send('slideshowrand=' + (e.target.checked ? 1 : 0));
+});
 function setupElement(id,value){
+  if(id === 'slideshow'){ slideshowApply(value); return; }
+  if(id === 'slideshowrand'){ const c = getId('slidernd'); if(c) c.checked = !!(parseInt(value)); return; }
   if(id.indexOf('alarm') === 0){ alarmApply(id, value); return; }
   if(id === 'sleepleft'){ sleepSetCountdown(parseInt(value) || 0); return; }
   if(id === 'sleeptimer'){

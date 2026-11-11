@@ -439,3 +439,8 @@ table.stations .importantmessage { color: var(--accent-color) !important; font-s
        only screen and (min-device-pixel-ratio: 2) {
   #copy { padding-bottom: 20px; }
 }
+#slideinfo { gap: 8px; }
+#slideinfo select, #slidebtn { background: var(--odd-bg-color); color: var(--main-hl-color); border: var(--accent-color) 1.5px solid; border-radius: 12px; padding: 2px 10px; font-size: 13px; }
+#slidebtn { cursor: pointer; }
+#slidebtn.active { font-weight: bold; }
+#slideinfo label { display: flex; align-items: center; gap: 3px; font-size: 13px; }

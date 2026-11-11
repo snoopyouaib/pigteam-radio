@@ -89,6 +89,10 @@ class Display {
     void _reinitWidgets();
     void _setLayoutPointers();
     void _applyState();
+    void _slideshowBegin();
+    void _slideshowEnd();
+    void _menuBegin();
+    void _menuEnd();
     void _showDialog(const char *title);
     void _setReturnTicker(uint8_t time_s);
     void _swichMode(displayMode_e newmode);
