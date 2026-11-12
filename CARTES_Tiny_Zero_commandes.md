@@ -101,6 +101,30 @@ Libres : 10, 11, 43/44. Interdits : 33–37 (PSRAM octale), 19/20 (USB). Flash :
 
 Alimentation : sans module batterie, le 5 V vient du port USB-C (broche 5V/VBUS de la carte si elle est sortie — à vérifier dans le README de la Tiny). La broche 5V est en général le même point que le 5 V USB (souvent via diode) : **ne pas brancher l'USB en même temps qu'une alimentation externe sur cette broche** sans être sûr d'une diode. Sinon, le MAX98357 peut rester sur le 3,3 V de la carte à volume modéré.
 
+## 🚀 Commandes de flash (toutes les cartes)
+
+Dans `D:\vscode_projets\pigteam-radio` (PowerShell), **moniteur série fermé**. Remplacer `<env>` :
+
+| Carte | `<env>` |
+|---|---|
+| ESP32-S3 N16R8 (ILI9488 / ILI9341 / OLED + PCM5102) | `ehradio_s3_n16r8` |
+| ESP32-S3-Tiny N8R8 + ILI9488 tactile | `ehradio_s3_tiny_ili9488` |
+| ESP32-S3-Tiny N8R8 + ST7789 + rotatif | `ehradio_s3_tiny_tft` |
+| ESP32-S3-Zero N8R8 + ILI9488 tactile | `ehradio_s3_zero_tft` |
+| ESP32-S3-Zero 4 Mo + OLED | `ehradio_s3_zero` |
+
+```powershell
+pio run -e <env> -t uploadfs          # 1. pages web (carte neuve, ou si data\www a change) - D'ABORD
+pio run -e <env> -t upload            # 2. firmware (seul, pour un changement de code)
+pio device monitor -e <env>           # 3. moniteur serie (Ctrl+C pour quitter)
+```
+
+- `uploadfs` **ecrase** `wifi.csv` et `playlist.csv` de la carte par ceux de `data\` (les garder a jour, exports dans `playlists\`).
+- Carte non reconnue : maintenir **BOOT** en branchant l'USB-C (ou BOOT + RESET), puis relancer ; `--upload-port COMx` si PlatformIO se trompe de port (le port change parfois en mode BOOT).
+- Apres un reflash : SAFE MODE jusqu'a 30 s de fonctionnement stable ; lancer la lecture a la main.
+- Tiny : l'envoi est **non compresse** (script `builds\platformio_tiny_no_compress.py`, voir piege n°6 ci-dessous) ; en cas d'echec de `uploadfs`, commande directe : `pio pkg exec -p tool-esptoolpy -- esptool --chip esp32s3 --port COMx write-flash --no-compress 0x670000 .pio\build\<env>\spiffs.bin`.
+- Effacer la partition de fichiers (firmware et reglages conserves) : `pio pkg exec -p tool-esptoolpy -- esptool --chip esp32s3 --port COMx erase-region 0x670000 0x180000` (partitions 8 Mo ; pour le N16R8, voir `default_16MB.csv`).
+
 ## 🧱 Pièges de compilation / flash (Tiny)
 
 1. **Octal PSRAM** : `board_build.arduino.memory_type = qio_opi` (le N8R8 Tiny). Avec `qio_qspi` : `PSRAM: 0MB`, pas de serveur web, 4 Ko de heap libre. `qio_qspi` = uniquement la Zero 4 Mo (N4R2).

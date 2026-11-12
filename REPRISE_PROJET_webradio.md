@@ -174,6 +174,7 @@ Si ehRadio change la liste de `[ehradio].lib_deps` lors d'une mise à jour de tr
    - **Par le WebUI** : page de réglage des stations, boutons *Ajouter, Supprimer, Remplacer, Fusionner, Exporter, Partager, enregistrer, Annuler*. *Remplacer* = la liste du fichier remplace l'ancienne (carte neuve) ; *Fusionner* = ajoute à l'existante ; *Exporter* = sauvegarde en CSV. ⚠️ **Il faut cliquer sur « enregistrer »** après un import ou une modification, sinon rien n'est conservé.
    - **Avant le flash** : fichier renommé `playlist.csv` dans `webradio\data\data\` puis `uploadfs` (à vérifier avec `dir webradio\data\data`). Attention : chaque `uploadfs` remplace alors la playlist de la carte par celle du dossier ; exporter et mettre à jour ce fichier après toute modification des stations.
 6. Après une modification du seul code : l'étape 2 suffit. `uploadfs` seulement si `data\www` change. Fermer le moniteur série avant tout upload.
+7. **Commandes de flash de toutes les cartes** (N16R8, Tiny, Zero) : voir `CARTES_Tiny_Zero_commandes.md`, section « Commandes de flash ». Moniteur série : `pio device monitor -e ehradio_s3_n16r8`. Carte non reconnue : maintenir BOOT en branchant l'USB.
 
 Si la radio demande d'importer les fichiers de `data\www`, c'est que `uploadfs` n'a pas été fait avant le premier démarrage (page de secours qui propose aussi d'importer des CSV). Quand `uploadfs` a été fait avant, cette page n'apparaît pas : le log indique `Loaded 17 files into PSRAM cache` dès le premier démarrage.
 
