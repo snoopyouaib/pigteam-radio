@@ -8,7 +8,7 @@
 | Carte | Env PlatformIO | État |
 |---|---|---|
 | ESP32-S3-Tiny N8R8 (8 Mo flash, PSRAM **octale** 8 Mo) + ST7789 320×240 + Lipo Rider Plus | `ehradio_s3_tiny_tft` | ✅ démarre, Wi-Fi, WebUI, fr_FR, Europe/Paris, météo FR, **son PCM5102 OK**, **son MAX98357 OK (en 3,3 V)**, commandes rotatif OK, **SD configurée (testée OK)**, **logo PigTeam rond au boot**, filtre des titres bidons OK, pas de tactile (normal) |
-| ESP32-S3-Tiny N8R8 + **ILI9488 480×320 tactile** + SD + PCM5102 (même firmware que la N16R8 : réveil, arrêt programmé, diaporama, menu tactile) | `ehradio_s3_tiny_ili9488` | ✅ (12 nov.) écran + tactile OK, Wi-Fi, WebUI, 17 fichiers web chargés, SD détectée ; son, diaporama, luminosité à valider |
+| ESP32-S3-Tiny N8R8 + **ILI9488 480×320 tactile** + SD + PCM5102 (même firmware que la N16R8 : réveil, arrêt programmé, diaporama, menu tactile) | `ehradio_s3_tiny_ili9488` | ✅ **tout validé le 12 nov. 2026** : écran + tactile, Wi-Fi, WebUI, `uploadfs` non compressé, **son MAX98357A**, **SD** (21 MP3, mode SD) + **diaporama** (174 photos 480×320, ~330 ms chacune), **luminosité** (PWM GPIO 6), **arrêt programmé** et **réveil** (montée 0→25 en 30 s) ; reste la batterie (GPIO 9) |
 | ESP32-S3-Zero 4 Mo (N4R2, PSRAM quad) + OLED SH1106 + rotatif + 2 boutons | `ehradio_s3_zero` | ⏳ config prête, pas encore testée (1 carte fonctionne, 2 peut-être abîmées par la chaleur) |
 | ESP32-S3 N16R8 + ILI9341 / OLED | `ehradio_s3_n16r8` | ✅ voir doc de reprise |
 
@@ -44,11 +44,11 @@ GPIO 43/44 = UART0 TX/RX (d'où le re-armementGPIO 43/44 = UART0 TX/RX (d'où le
 | TCS | 7 | T_CS |
 | TDO | 8 | MISO du tactile (seule ligne MISO) |
 | SDO, TCK, TDI, PEN | non branchés | SDO : l'ILI9488 ne libère pas la ligne ; TCK/TDI déjà doublés ; PEN (T_IRQ) inutile |
-| SD du module (bus SPI B) SCK / MOSI / MISO / CS | 11 / 12 / 13 / 14 | |
-| PCM5102 DIN / BCK / LCK | 16 / 17 / 18 | |
+| SD du module (bus SPI B) SCK / MOSI / MISO / CS | 15 / 12 / 13 / 14 | SCK déplacé de 11 à 15 pour grouper les 4 fils du même côté |
+| PCM5102 ou MAX98357A DIN / BCK / LCK | 16 / 17 / 18 | MAX98357A validé (même câblage) |
 | Batterie (optionnelle, ×2) | 9 | ADC1 : l'ADC2 (GPIO 11 à 20) est inutilisable avec le Wi-Fi |
 
-Libres : 10, 15, 43/44. Interdits : 33–37 (PSRAM octale), 19/20 (USB). Flash : `-e ehradio_s3_tiny_ili9488`, envoi non compressé déjà configuré dans l'env (voir piège n°6).
+Libres : 10, 11, 43/44. Interdits : 33–37 (PSRAM octale), 19/20 (USB). Flash : `-e ehradio_s3_tiny_ili9488`, envoi non compressé déjà configuré dans l'env (voir piège n°6).
 
 ## 🎮 Commandes (sans tactile)
 
@@ -140,7 +140,8 @@ Haut-parleur 4 à 8 Ω. **Grésillements** constatés au début : causés par de
 - [x] MAX98357 testé en 3,3 V.
 - [ ] Souder le câblage du MAX98357, tester en 5 V ; version autonome (LiPo + Lipo Rider Plus + haut-parleur).
 - [ ] Brancher une LiPo et étalonner la batterie ; tester la luminosité (PWM GPIO 16).
-- [ ] Tiny + ILI9488 : valider le son (PCM5102 16/17/18), la SD + diaporama, la luminosité (GPIO 6), réveil et arrêt programmé ; vérifier que `uploadfs` passe avec `--no-compress`.
+- [x] Tiny + ILI9488 : son, SD + diaporama, luminosité, réveil, arrêt programmé et `uploadfs` validés (12 nov. 2026).
+- [ ] Tiny + ILI9488 : brancher une LiPo et étalonner la batterie (GPIO 9).
 - [ ] Tester la S3-Zero OLED (`-e ehradio_s3_zero`, `uploadfs` puis `upload` — ou page de secours si `uploadfs` échoue) et les 2 cartes douteuses.
 - [ ] Envoyer l'issue à trip5 (`ISSUE_trip5_ESPFileUpdater.md`).
 - [ ] Sculpture de circuit en laiton (Ø 1 mm commandé) : idée de forme encore en réflexion ; objectif 1 ou 2 cadeaux pour Noël ; s'entraîner à souder le laiton (tiges, anneau, figure plate, puis 3D).

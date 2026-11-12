@@ -106,11 +106,11 @@
        TDO       8     T_DO = MISO du tactile (seule ligne MISO du bus)
      NON BRANCHES : SDO (l'ILI9488 ne libere pas la ligne), TCK et TDI (deja doubles
      sur SCK/SDI), PEN (T_IRQ inutilise).
-   Carte SD du module (bus SPI B) : SCK 11, MOSI 12, MISO 13, CS 14
+   Carte SD du module (bus SPI B) : SCK 15, MOSI 12, MISO 13, CS 14
    PCM5102 : DIN 16, BCK 17, LCK 18
    Batterie (optionnelle, Lipo Rider Plus, pont 10k/10k) : GPIO 9 (ADC1 : l'ADC2,
      GPIO 11 a 20, est inutilisable quand le Wi-Fi est actif)
-   Libres : 10, 15, 43/44 (UART0). Interdits : 33-37 (PSRAM octale), 19/20 (USB).
+   Libres : 10, 11, 43/44 (UART0). Interdits : 33-37 (PSRAM octale), 19/20 (USB).
    ------------------------------------------------------------------ */
   #define DSP_MODEL     DSP_ILI9488   /* 480x320 ; playlist en pages (ecran lent) */
   #define SPIA_SCK      5
@@ -128,7 +128,7 @@
   #define BATTERY_PIN           9
   #define BATTERY_DIVIDER_RATIO 2.0
 
-  #define SPIB_SCK      11
+  #define SPIB_SCK      15
   #define SPIB_MOSI     12
   #define SPIB_MISO     13
   #define SD_SPI        'B'
