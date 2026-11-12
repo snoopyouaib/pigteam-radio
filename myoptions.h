@@ -277,6 +277,9 @@
 /* Logo de demarrage PigTeam (rond) sur les ecrans >= 176 px de haut. */
 #define PIGTEAM_LOGO
 
+/* Duree d'affichage par photo du diaporama (s) : 5 (le menu tactile propose 5, 8, 15, 30, 60). */
+#define SLIDESHOW_DEFAULT_SECS 5
+
 /* Police de l'horloge : YO_MONO = 7 segments fins facon yoRadio.
    Autres choix : CHUNKY6_PX (gros pixels, defaut) ou CHUNKY6.
    CLOCKGLOW = fond "afficheur allume" derriere les chiffres. */

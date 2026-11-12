@@ -680,6 +680,7 @@ void Display::loop() {
             _time(request.payload);
           break;
         case NEWTITLE: _title(); break;
+        case DSPSLEEP: _titleText(); break;   // rafraichit les minutes restantes sans relancer l'economiseur d'ecran
         case NEWSTATION: _station(); break;
         case NEXTSTATION: _drawNextStationNum(request.payload); break;
         case DRAWPLAYLIST: _drawPlaylist(); break;
@@ -870,16 +871,27 @@ char *split(char *str, const char *delim) {
   return dmp + strlen(delim);
 }
 
-void Display::_title() {
-  if (strlen(config.station.title) > 0) {
-    char tmpbuf[strlen(config.station.title)+1];
-    strlcpy(tmpbuf, config.station.title, strlen(config.station.title)+1);
+/* Affiche le titre. Si un arret programme est actif, " (arret N min)" (minutes restantes) est ajoute
+   a la fin du titre, a l'ecran seulement (le titre du WebUI reste inchange). */
+void Display::_titleText() {
+  char full[STATION_FIELD_LENGTH + 32];
+  strlcpy(full, config.station.title, sizeof(full));
+  #ifdef SLEEP_TIMER_ENABLE
+    if (player.sleepMinutes()) {
+      char sfx[32];
+      snprintf(sfx, sizeof(sfx), "%s(arret %u min)", full[0] ? " " : "", (unsigned)((player.sleepRemaining() + 59) / 60));
+      strlcat(full, sfx, sizeof(full));
+    }
+  #endif
+  if (strlen(full) > 0) {
+    char tmpbuf[strlen(full)+1];
+    strlcpy(tmpbuf, full, strlen(full)+1);
     char *stitle = split(tmpbuf, " - ");
     if (stitle && _title2) {
       _title1->setText(tmpbuf);
       _title2->setText(stitle);
     } else {
-      _title1->setText(config.station.title);
+      _title1->setText(full);
       if (_title2) _title2->setText("");
     }
     
@@ -887,6 +899,10 @@ void Display::_title() {
     _title1->setText("");
     if (_title2) _title2->setText("");
   }
+}
+
+void Display::_title() {
+  _titleText();
   rgbled.trackChange();
   backlightControls.restart();
 }

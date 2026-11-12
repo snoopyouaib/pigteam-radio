@@ -41,6 +41,7 @@ class Display {
     void _setRSSI(int rssi);
     void _station();
     void _title();
+    void _titleText();               // texte des lignes de titre (+ minutes restantes de l'arret programme)
     void _time(bool redraw = false);
     void _volume();
     void flip();

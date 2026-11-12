@@ -84,6 +84,7 @@ class Player: public Audio {
       uint16_t _sleepMinutes = 0;
       uint32_t _sleepEndMs = 0;
       int16_t  _sleepLastVol = -1;
+      uint32_t _sleepLastMin = 0;       // derniere minute restante affichee a l'ecran
       void _sleepTick();
     #endif
     #ifdef ALARM_ENABLE

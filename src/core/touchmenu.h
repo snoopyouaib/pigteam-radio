@@ -3,7 +3,7 @@
 #include "options.h"
 
 /* Menu rapide tactile : un appui long (sur l'ecran du lecteur) ouvre une grille de gros boutons :
-   4 colonnes x 2 lignes : Diapo (sous-menu ON / OFF / Aleatoire / Normal), Ecran off,
+   4 colonnes x 2 lignes : Diapo (sous-menu ON / Duree / Aleatoire / Normal), Ecran off,
    Mode SD/Radio, Reveil on/off, Arret programme, Stations (liste a pages), Fermer, + 1 pave libre.
    Active par  #define TOUCHMENU_ENABLE  dans myoptions.h (ecran couleur + tactile requis). */
 #if defined(TOUCHMENU_ENABLE) && (defined(DUMMYDISPLAY) || defined(DSP_OLED) || defined(DSP_LCD) || TS_MODEL==TS_MODEL_UNDEFINED)
@@ -48,6 +48,7 @@ class TouchMenu {
     volatile uint32_t _lastAct = 0;
     volatile uint8_t _page = 0;               // 0 = menu principal, 1 = sous-menu diaporama, 2 = liste des stations
     volatile uint16_t _stPage = 0;            // page courante de la liste des stations (0 = premiere)
+    volatile uint16_t _slideSecs = 5;         // duree par photo choisie dans le sous-menu diaporama (secondes)
     volatile uint16_t _arg = 0;               // argument de l'action differee (numero de station)
     uint8_t _drawPage = 0;                    // page en cours de dessin (copie coherente pour toute la passe)
     int _hit(int x, int y);

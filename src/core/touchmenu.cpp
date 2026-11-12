@@ -14,8 +14,10 @@ TouchMenu touchmenu;
 
 /* menu principal : 4 colonnes x 2 lignes, dans l'ordre de lecture */
 enum { TL_SLIDE, TL_SCREEN, TL_MODE, TL_ALARM, TL_SLEEP, TL_STATIONS, TL_FREE, TL_CLOSE, TL_COUNT };
-/* sous-menu diaporama : 2 colonnes x 2 lignes */
-enum { SB_ON, SB_OFF, SB_RANDOM, SB_NORMAL, SB_COUNT };
+/* sous-menu diaporama : 2 colonnes x 2 lignes (SB_TIME = duree par photo, chaque toucher passe a la suivante) */
+enum { SB_ON, SB_TIME, SB_RANDOM, SB_NORMAL, SB_COUNT };
+static const uint16_t SLIDE_TIMES[] = { 5, 8, 15, 30, 60 };   // secondes par photo
+#define SLIDE_TIMES_N (sizeof(SLIDE_TIMES) / sizeof(SLIDE_TIMES[0]))
 /* liste des stations : 6 par page (2 colonnes x 3 lignes) + ligne de navigation  < Retour > */
 enum { ST_PER_PAGE = 6, ST_PREV = 6, ST_BACK = 7, ST_NEXT = 8, ST_COUNT = 9 };
 
@@ -153,7 +155,13 @@ void TouchMenu::touchEnd() {
     switch (hit) {
       #ifdef SLIDESHOW_ENABLE
       case SB_ON:     _pending = TL_SLIDE; _wantOn = false; break;                    // lance apres fermeture du menu
-      case SB_OFF:    slideshow.stop("menu"); _wantOn = false; break;                 // arret (et sortie du menu)
+      case SB_TIME: {                                                                 // duree par photo : 5 -> 8 -> 15 -> 30 -> 60 -> 5 ...
+        size_t k = 0;
+        for (size_t j = 0; j < SLIDE_TIMES_N; j++) if (SLIDE_TIMES[j] == _slideSecs) k = j + 1;
+        _slideSecs = SLIDE_TIMES[k % SLIDE_TIMES_N];
+        _dirty = true;
+        break;
+      }
       case SB_RANDOM: slideshow.setRandom(true);  netserver.requestOnChange(SLIDESHOW, 0); _dirty = true; break;
       case SB_NORMAL: slideshow.setRandom(false); netserver.requestOnChange(SLIDESHOW, 0); _dirty = true; break;
       #endif
@@ -202,7 +210,7 @@ void TouchMenu::runPending() {
   _pending = -1;
   switch (a) {
     #ifdef SLIDESHOW_ENABLE
-    case TL_SLIDE:  slideshow.start(); break;
+    case TL_SLIDE:  slideshow.start(_slideSecs); break;
     #endif
     case TL_SCREEN: config.setDspOn(false); backlightControls.restart(); break;
     case TL_STATIONS: player.sendCommand({PR_PLAY, (uint32_t)_arg}); break;
@@ -244,7 +252,10 @@ void TouchMenu::_drawTile(int i, int W, int H) {
         l1 = "Arret";
         l2 = "non";
         #ifdef SLEEP_TIMER_ENABLE
-          if (player.sleepMinutes()) { snprintf(buf, sizeof(buf), "%u min", (unsigned)player.sleepMinutes()); l2 = buf; edge = TM_WARM; }
+          if (player.sleepMinutes()) {                         // minutes RESTANTES (arrondies au-dessus), pas la duree choisie
+            snprintf(buf, sizeof(buf), "%u min", (unsigned)((player.sleepRemaining() + 59) / 60));
+            l2 = buf; edge = TM_WARM;
+          }
         #endif
         break;
       case TL_STATIONS:
@@ -263,7 +274,7 @@ void TouchMenu::_drawTile(int i, int W, int H) {
     #endif
     switch (i) {
       case SB_ON:     l1 = "ON";        l2 = "lancer"; edge = TM_ON; break;
-      case SB_OFF:    l1 = "OFF";       l2 = "arreter"; break;
+      case SB_TIME:   l1 = "Duree";     snprintf(buf, sizeof(buf), "%u s / photo", (unsigned)_slideSecs); l2 = buf; edge = TM_WARM; break;
       case SB_RANDOM: l1 = "Aleatoire"; l2 = "ordre melange"; if (rnd) edge = TM_ON; break;
       case SB_NORMAL: l1 = "Normal";    l2 = "alphabetique";  if (!rnd) edge = TM_ON; break;
       default: break;

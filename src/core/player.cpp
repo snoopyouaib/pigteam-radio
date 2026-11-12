@@ -490,9 +490,8 @@ void Player::startSleepTimer(uint16_t minutes) {
   _sleepLastVol = -1;
   _sleepActive = true;
   FUNCTIONLOG("SleepTimer", "Arret programme dans %u min", minutes);
-  char msg[32];
-  snprintf(msg, sizeof(msg), "Arret dans %u min", minutes);
-  config.setTitle(msg);
+  _sleepLastMin = minutes;
+  display.putRequest(DSPSLEEP);   // "(arret N min)" ajoute au titre affiche, titre de la radio conserve
   netserver.requestOnChange(SLEEPTIMER, 0);
 }
 
@@ -504,6 +503,7 @@ void Player::cancelSleepTimer() {
     if (_sleepLastVol >= 0) _applyI2SVolume(volToI2S(config.store.volume)); // fondu en cours : on rend le volume
     _sleepLastVol = -1;
     FUNCTIONLOG("SleepTimer", "Arret programme annule");
+    display.putRequest(DSPSLEEP);
     netserver.requestOnChange(SLEEPTIMER, 0);
   }
 }
@@ -524,9 +524,12 @@ void Player::_sleepTick() {
     FUNCTIONLOG("SleepTimer", "Fin du compte a rebours : arret");
     if (_status == PLAYING || isRunning()) _stop();
     _applyI2SVolume(volToI2S(config.store.volume)); // volume normal pour la prochaine lecture
+    display.putRequest(DSPSLEEP);
     netserver.requestOnChange(SLEEPTIMER, 0);
     return;
   }
+  uint32_t minsLeft = ((uint32_t)left + 59999UL) / 60000UL;   // minutes restantes, arrondies au-dessus
+  if (minsLeft != _sleepLastMin) { _sleepLastMin = minsLeft; display.putRequest(DSPSLEEP); }
   if ((uint32_t)left < SLEEP_FADE_MS && isRunning()) {
     uint8_t base = volToI2S(config.store.volume);
     uint8_t v = (uint8_t)(((uint32_t)base * (uint32_t)left) / SLEEP_FADE_MS);
