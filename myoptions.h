@@ -2,11 +2,12 @@
 #define myoptions_h
 
 /* ------------------------------------------------------------------
-   ehRadio - PigTeam - 4 cartes, choisies par l'environnement PlatformIO :
+   ehRadio - PigTeam - 5 cartes, choisies par l'environnement PlatformIO :
      ehradio_s3_n16r8      : ESP32-S3 N16R8 + ecran au choix (voir ECRAN) + PCM5102
      ehradio_s3_zero_tft   : ESP32-S3-Zero N8R8 + ILI9488 480x320 tactile + SD + PCM5102
      ehradio_s3_zero       : ESP32-S3-Zero 4 Mo + OLED 1,3" + rotatif + 2 boutons
      ehradio_s3_tiny_tft   : ESP32-S3-Tiny N8R8 + TFT ST7789 + rotatif + BACK
+     ehradio_s3_tiny_ili9488 : ESP32-S3-Tiny N8R8 + ILI9488 480x320 tactile + SD + PCM5102 (comme le N16R8)
 
    Commandes des cartes SANS tactile (Zero et Tiny) :
      rotatif : tourner = volume
@@ -85,6 +86,62 @@
   #define I2S_DOUT      4             /* PCM5102 DIN */
   #define I2S_BCLK      5             /* PCM5102 BCK */
   #define I2S_LRC       6             /* PCM5102 LCK */
+  #define VS1053_CS     255
+#elif defined(CARTE_TINY_ILI9488)
+/* ------------------------------------------------------------------
+   Env ehradio_s3_tiny_ili9488 : ESP32-S3-Tiny N8R8 (8 Mo flash, 8 Mo PSRAM octale)
+   + ecran 4" 480x320 ILI9488 + tactile XPT2046 + SD du module + PCM5102.
+   Meme firmware que le N16R8 (reveil, arret programme, diaporama, menu tactile) ;
+   seul le brochage change. Pas de rotatif ni de bouton BACK : tout au tactile.
+
+   Ecran : GPIO 1 a 8 dans l'ordre des broches du module
+       module   GPIO   remarque
+       CS        1
+       RST       2
+       D/C       3     (strapping JTAG : sans effet ici)
+       SDI       4     MOSI ; T_DIN (TDI) est relie a SDI par un point de soudure sur le module
+       SCK       5     T_CLK (TCK) est relie a SCK de la meme facon
+       BL/LED    6     PWM, commande le transistor Q1 du module
+       TCS       7     T_CS du tactile
+       TDO       8     T_DO = MISO du tactile (seule ligne MISO du bus)
+     NON BRANCHES : SDO (l'ILI9488 ne libere pas la ligne), TCK et TDI (deja doubles
+     sur SCK/SDI), PEN (T_IRQ inutilise).
+   Carte SD du module (bus SPI B) : SCK 11, MOSI 12, MISO 13, CS 14
+   PCM5102 : DIN 16, BCK 17, LCK 18
+   Batterie (optionnelle, Lipo Rider Plus, pont 10k/10k) : GPIO 9 (ADC1 : l'ADC2,
+     GPIO 11 a 20, est inutilisable quand le Wi-Fi est actif)
+   Libres : 10, 15, 43/44 (UART0). Interdits : 33-37 (PSRAM octale), 19/20 (USB).
+   ------------------------------------------------------------------ */
+  #define DSP_MODEL     DSP_ILI9488   /* 480x320 ; playlist en pages (ecran lent) */
+  #define SPIA_SCK      5
+  #define SPIA_MOSI     4
+  #define SPIA_MISO     8             /* MISO du tactile (T_DO) */
+  #define TFT_CS        1
+  #define TFT_DC        3
+  #define TFT_RST       2
+  #define TS_MODEL      TS_MODEL_XPT2046
+  #define TS_SPI        'A'
+  #define TS_CS         7
+
+  #define BRIGHTNESS_PIN        6
+  #define DSP_DIMMING_ENABLED   true
+  #define BATTERY_PIN           9
+  #define BATTERY_DIVIDER_RATIO 2.0
+
+  #define SPIB_SCK      11
+  #define SPIB_MOSI     12
+  #define SPIB_MISO     13
+  #define SD_SPI        'B'
+  #define SD_CS         14
+
+  #define SLIDESHOW_ENABLE
+  #define SLIDESHOW_RANDOM_DEFAULT true
+  #define TOUCHMENU_ENABLE
+  #define DSP_TASK_STACK_SIZE   12      /* KB : decodage JPEG + lecture SD */
+
+  #define I2S_DOUT      16            /* PCM5102 DIN */
+  #define I2S_BCLK      17            /* PCM5102 BCK */
+  #define I2S_LRC       18            /* PCM5102 LCK */
   #define VS1053_CS     255
 #elif defined(CARTE_TINY_TFT)
 /* ------------------------------------------------------------------
