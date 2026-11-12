@@ -1,6 +1,6 @@
 # 🎛️ Cartes Tiny TFT / S3-Zero OLED — config et commandes (ehRadio)
 
-> Complément de `REPRISE_PROJET_webradio.md` (qui décrit la N16R8). Dernière mise à jour : 7 novembre 2026.
+> Complément de `REPRISE_PROJET_webradio.md` (qui décrit la N16R8). Dernière mise à jour : 12 novembre 2026 (ajout Tiny + ILI9488, correctif `uploadfs`).
 > Dépôt : `D:\vscode_projets\ehradio-pigteam` (privé, GitHub `snoopyouaib/ehradio-pigteam`, remotes `origin` + `upstream`). Un futur dépôt privé « radio-pigteam » est prévu (garder l'historique : `git remote rename origin ancien`, `git remote add origin ...`, `git push -u origin --all`, `git push origin --tags`). Pas de distribution prévue : usage perso (GPL v3 non contraignante sans diffusion).
 
 ## 📦 État
@@ -8,10 +8,11 @@
 | Carte | Env PlatformIO | État |
 |---|---|---|
 | ESP32-S3-Tiny N8R8 (8 Mo flash, PSRAM **octale** 8 Mo) + ST7789 320×240 + Lipo Rider Plus | `ehradio_s3_tiny_tft` | ✅ démarre, Wi-Fi, WebUI, fr_FR, Europe/Paris, météo FR, **son PCM5102 OK**, **son MAX98357 OK (en 3,3 V)**, commandes rotatif OK, **SD configurée (testée OK)**, **logo PigTeam rond au boot**, filtre des titres bidons OK, pas de tactile (normal) |
+| ESP32-S3-Tiny N8R8 + **ILI9488 480×320 tactile** + SD + PCM5102 (même firmware que la N16R8 : réveil, arrêt programmé, diaporama, menu tactile) | `ehradio_s3_tiny_ili9488` | ✅ (12 nov.) écran + tactile OK, Wi-Fi, WebUI, 17 fichiers web chargés, SD détectée ; son, diaporama, luminosité à valider |
 | ESP32-S3-Zero 4 Mo (N4R2, PSRAM quad) + OLED SH1106 + rotatif + 2 boutons | `ehradio_s3_zero` | ⏳ config prête, pas encore testée (1 carte fonctionne, 2 peut-être abîmées par la chaleur) |
 | ESP32-S3 N16R8 + ILI9341 / OLED | `ehradio_s3_n16r8` | ✅ voir doc de reprise |
 
-Un seul `myoptions.h` pour les 3 : `-DCARTE_ZERO` et `-DCARTE_TINY_TFT` (flags de l'env) choisissent la branche ; sans flag = n16r8 (`ECRAN_OLED 0/1`). VS Code grise les branches inactives : c'est normal (ce ne sont pas des commentaires).
+Un seul `myoptions.h` pour toutes les cartes : `-DCARTE_ZERO`, `-DCARTE_TINY_TFT`, `-DCARTE_TINY_ILI9488` (flags de l'env) choisissent la branche ; sans flag = n16r8 (`ECRAN_OLED 0/1`). VS Code grise les branches inactives : c'est normal (ce ne sont pas des commentaires).
 
 Cartes en stock (inventaire) : Waveshare ESP32-S3-DEV-KIT en N32R16V (module **WROOM-2** : flash et PSRAM **octales**, mode `opi_opi` + `flash_mode = opi` à prévoir, GPIO 26–37 interdits ; rien de préparé) ; un N8R8 du même modèle suffirait (même mémoire que la Tiny, `qio_opi`, `default_8MB.csv`).
 
@@ -28,7 +29,26 @@ Cartes en stock (inventaire) : Waveshare ESP32-S3-DEV-KIT en N32R16V (module **W
 | Carte SD (bus SPI **B**, `SD_SPI 'B'`) CS / MOSI / MISO / SCK | 10 / 7 / 8 / 9 |
 | I2S (PCM5102 ou MAX98357) DIN / BCK / LCK | 4 / 5 / 6 |
 
-GPIO 43/44 = UART0 TX/RX (d'où le re-armement des broches, voir ci-dessous). 0 et 3 = strapping, 19/20 = USB. GPIO 2 et 3 libres.
+GPIO 43/44 = UART0 TX/RX (d'où le re-armementGPIO 43/44 = UART0 TX/RX (d'où le re-armement des broches, voir ci-dessous). 0 et 3 = strapping, 19/20 = USB. GPIO 2 et 3 libres.
+
+## 🔌 Tiny + ILI9488 — brochage (env `ehradio_s3_tiny_ili9488`, 12 nov. 2026)
+
+Écran 4" 480×320 ILI9488 + tactile XPT2046 + SD du module + PCM5102, sans rotatif ni BACK (tout au tactile). Écran sur **GPIO 1 à 8** dans l'ordre des broches du module (câblage facile) ; branche `CARTE_TINY_ILI9488` de `myoptions.h`.
+
+| Module | GPIO | Remarque |
+|---|---|---|
+| CS / RST / D/C | 1 / 2 / 3 | |
+| SDI (+ TDI) | 4 | MOSI ; T_DIN relié à SDI par un pont sur le module |
+| SCK (+ TCK) | 5 | T_CLK relié à SCK par un pont sur le module |
+| BL (LED) | 6 | PWM, transistor Q1 du module |
+| TCS | 7 | T_CS |
+| TDO | 8 | MISO du tactile (seule ligne MISO) |
+| SDO, TCK, TDI, PEN | non branchés | SDO : l'ILI9488 ne libère pas la ligne ; TCK/TDI déjà doublés ; PEN (T_IRQ) inutile |
+| SD du module (bus SPI B) SCK / MOSI / MISO / CS | 11 / 12 / 13 / 14 | |
+| PCM5102 DIN / BCK / LCK | 16 / 17 / 18 | |
+| Batterie (optionnelle, ×2) | 9 | ADC1 : l'ADC2 (GPIO 11 à 20) est inutilisable avec le Wi-Fi |
+
+Libres : 10, 15, 43/44. Interdits : 33–37 (PSRAM octale), 19/20 (USB). Flash : `-e ehradio_s3_tiny_ili9488`, envoi non compressé déjà configuré dans l'env (voir piège n°6).
 
 ## 🎮 Commandes (sans tactile)
 
@@ -89,7 +109,7 @@ Alimentation : sans module batterie, le 5 V vient du port USB-C (broche 5V/VBUS 
 4. **ESPFileUpdater** : version corrigée dans `lib\ESPFileUpdater\` (pas dans `lib_deps`), voir doc de reprise n°7.
 5. Nouvelle carte : `uploadfs` **d'abord**, puis `upload`. `uploadfs` n'est utile que si `data\www` change ; **ne pas le lancer pour appliquer un patch de code** (`-t upload` suffit).
 6. **`uploadfs` en USB échoue sur la Tiny** à 74,2 % (« The chip stopped responding »), toujours au même endroit, même à 230400 bauds, sans ampli, autre câble et autre port. La partition de fichiers reste alors à moitié écrite : la radio affiche la **page de secours** (« Outil de téléchargement de fichiers via l'interface Web ») et peut la reperdre au redémarrage. Remède qui a marché : (a) effacer proprement la partition de fichiers (le firmware et les réglages ne sont pas touchés) :
-   `pio pkg exec -p tool-esptoolpy -- esptool --chip esp32s3 --port COM16 erase-region 0x670000 0x180000` (sinon `erase_region`), moniteur série fermé ; (b) redémarrer, ouvrir la page de secours, envoyer **tous** les fichiers de `data\www\` (17, dont `rb_srvrs.json`) puis le CSV de playlist/Wi-Fi ; (c) vérifier au redémarrage : `Loaded 17 files into PSRAM cache`. Pistes non testées : `upload_flags = --no-compress` dans l'env Tiny. Le log du moniteur série : utiliser `pio device monitor -e ehradio_s3_tiny_tft`.
+   `pio pkg exec -p tool-esptoolpy -- esptool --chip esp32s3 --port COM16 erase-region 0x670000 0x180000` (sinon `erase_region`), moniteur série fermé ; (b) redémarrer, ouvrir la page de secours, envoyer **tous** les fichiers de `data\www\` (17, dont `rb_srvrs.json`) puis le CSV de playlist/Wi-Fi ; (c) vérifier au redémarrage : `Loaded 17 files into PSRAM cache`. **Correctif trouvé le 12 nov. 2026** : le plantage a lieu dans l'écriture **compressée** (`flash_defl_block`) ; `esptool … write-flash --no-compress 0x670000 .pio\build\<env>\spiffs.bin` passe (1,5 Mo en 15 s, hash vérifié, `Loaded 17 files into PSRAM cache` au démarrage). Réglage permanent : script `builds/platformio_tiny_no_compress.py` (remplace `-z` par `--no-compress` dans les flags d'esptool), appelé par `extra_scripts` dans les envs `ehradio_s3_tiny_ili9488` et `ehradio_s3_tiny_tft` (à vérifier au prochain `uploadfs` ; sinon la commande esptool directe ci-dessus). ⚠️ `upload_flags = --no-compress` ne marche **pas** : PlatformIO le place avant `write-flash` (erreur « No such option »). Le point de coupure variait (74 % puis 95 %) : ce n'est pas lié à un fichier. Hypothèse non prouvée : alimentation / liaison USB-Serial/JTAG. Le log du moniteur série : utiliser `pio device monitor -e ehradio_s3_tiny_tft`.
 
 ## 🔊 Sortie audio
 
@@ -120,6 +140,7 @@ Haut-parleur 4 à 8 Ω. **Grésillements** constatés au début : causés par de
 - [x] MAX98357 testé en 3,3 V.
 - [ ] Souder le câblage du MAX98357, tester en 5 V ; version autonome (LiPo + Lipo Rider Plus + haut-parleur).
 - [ ] Brancher une LiPo et étalonner la batterie ; tester la luminosité (PWM GPIO 16).
+- [ ] Tiny + ILI9488 : valider le son (PCM5102 16/17/18), la SD + diaporama, la luminosité (GPIO 6), réveil et arrêt programmé ; vérifier que `uploadfs` passe avec `--no-compress`.
 - [ ] Tester la S3-Zero OLED (`-e ehradio_s3_zero`, `uploadfs` puis `upload` — ou page de secours si `uploadfs` échoue) et les 2 cartes douteuses.
 - [ ] Envoyer l'issue à trip5 (`ISSUE_trip5_ESPFileUpdater.md`).
 - [ ] Sculpture de circuit en laiton (Ø 1 mm commandé) : idée de forme encore en réflexion ; objectif 1 ou 2 cadeaux pour Noël ; s'entraîner à souder le laiton (tiges, anneau, figure plate, puis 3D).
