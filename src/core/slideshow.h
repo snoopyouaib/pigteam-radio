@@ -34,6 +34,7 @@ class Slideshow {
     void stop(const char* who = "?");                     // idem ; 'who' apparait dans le log
     void touchBegin();                                    // tactile : debut d'un toucher
     void touchEnd();                                      // tactile : fin d'un toucher (arrete si c'etait un vrai appui)
+    void touchCancel();                                   // tactile : le toucher est un glissement (luminosite/volume), il n'arrete pas le diaporama
     bool active() const { return _wantOn; }
     void setRandom(bool r) { _random = r; _reorder = true; }
     bool isRandom() const { return _random; }
@@ -57,6 +58,7 @@ class Slideshow {
     void _buildOrder();
     volatile bool _busy = false;      // decodage / ecriture ecran en cours
     uint32_t _touchAt = 0;
+    uint32_t _swipeAt = 0;                                // dernier instant ou un glissement a ete vu (le tactile resistif peut couper le toucher en plein geste)
     std::vector<String> _files;
     bool _scan();
     bool _show(const char* path);

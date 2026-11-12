@@ -53,8 +53,15 @@ void Slideshow::stop(const char* who) {
    des touchers fantomes. On ignore donc les touchers qui commencent pendant l'ecriture, et on ne
    s'arrete qu'a la fin d'un appui qui a dure au moins 60 ms (un parasite dure un seul cycle de 20 ms). */
 void Slideshow::touchBegin() {
+  if (_swipeAt && (millis() - _swipeAt) < 800) { _touchAt = 0; return; }   // suite d'un glissement coupe par le tactile : pas un appui
   _touchAt = _busy ? 0 : millis();
   if (!_busy && _touchAt == 0) _touchAt = 1;
+}
+
+void Slideshow::touchCancel() {
+  _touchAt = 0;
+  _swipeAt = millis();
+  if (_swipeAt == 0) _swipeAt = 1;
 }
 
 void Slideshow::touchEnd() {

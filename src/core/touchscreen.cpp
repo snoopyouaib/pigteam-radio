@@ -10,6 +10,7 @@
 #include "network.h"
 #include "utility.h"
 #include "player.h"
+#include "backlightcontrols.h"
 #include "touchscreen.h"
 
 #ifndef TS_X_MIN
@@ -42,6 +43,15 @@
 #endif
 #ifndef TS_DOUBLETAP_MS
   #define TS_DOUBLETAP_MS        400
+#endif
+#ifndef TS_BRIGHTNESS_MIN
+  #define TS_BRIGHTNESS_MIN      5     // PigTeam : luminosite minimale par glissement (evite l'ecran noir)
+#endif
+#ifndef TS_MENU_ZONE_W
+  #define TS_MENU_ZONE_W         90    // PigTeam : zone tactile (coin superieur gauche) qui ouvre le menu rapide : largeur (px)
+#endif
+#ifndef TS_MENU_ZONE_H
+  #define TS_MENU_ZONE_H         70    // ... et hauteur (px)
 #endif
 #ifndef TS_LONGPRESS_MS
   #define TS_LONGPRESS_MS        1200  // PigTeam : appui long immobile = bascule radio <-> SD
@@ -131,6 +141,9 @@ void TouchScreen::loop() {
   static uint32_t touchLongPress;
   static tsDirection_e direct;
   static uint16_t touchVol, touchStation;
+  static bool cornerTap = false;       // PigTeam : toucher commence dans la zone du menu (coin superieur gauche)
+  static bool slideMaybe = false;      // PigTeam : toucher commence pendant le diaporama (appui = stop, glissement vertical = luminosite)
+  static bool brightChanged = false;   // PigTeam : luminosite modifiee par glissement vertical, a sauvegarder au relachement
   if (!_checklpdelay(20, _touchdelay)) return;
   #ifdef TOUCHMENU_ENABLE
     touchmenu.runPending();   // action choisie dans le menu, lancee une fois celui-ci ferme
@@ -169,6 +182,7 @@ void TouchScreen::loop() {
       touchVol = touchX;
       touchStation = touchY;
       direct = TSD_REQUEST;
+      slideMaybe = false;
       touchLongPress=millis();
       #ifdef TOUCHMENU_ENABLE
         if (touchmenu.active()) {          // menu ouvert : les touchers lui appartiennent
@@ -180,9 +194,30 @@ void TouchScreen::loop() {
         if (slideshow.active()) {          // un vrai appui arrete le diaporama (voir Slideshow::touchEnd) sans autre effet
           slideshow.touchBegin();
           direct = TSD_STAY;
+          slideMaybe = true;
+        }
+      #endif
+      #ifdef TOUCHMENU_ENABLE
+        cornerTap = false;
+        if (direct == TSD_REQUEST && display.mode()==PLAYER && touchX < TS_MENU_ZONE_W && touchY < TS_MENU_ZONE_H) {
+          cornerTap = true;              // ouvre le menu au relachement (ni lecture/arret, ni glissement)
+          direct = TSD_STAY;
         }
       #endif
     } else { /*     SWIPE TOUCH     */
+      #ifdef TOUCHMENU_ENABLE
+        if (cornerTap && (touchX >= TS_MENU_ZONE_W || touchY >= TS_MENU_ZONE_H)) cornerTap = false;   // le doigt a quitte la zone : annule
+      #endif
+      #ifdef SLIDESHOW_ENABLE
+        if (slideMaybe && direct == TSD_STAY) {   // diaporama : un glissement regle luminosite / volume sans arreter le diaporama
+          tsDirection_e d = _tsDirection(touchX, touchY);
+          if (d != TSD_REQUEST) {
+            direct = d;                           // glissement = reglage (haut/bas luminosite, gauche/droite volume), pas un arret
+            slideshow.touchCancel();
+            slideMaybe = false;
+          }
+        }
+      #endif
       if (direct == TSD_REQUEST) {
         direct = _tsDirection(touchX, touchY);
         if (direct != TSD_REQUEST) {
@@ -192,7 +227,9 @@ void TouchScreen::loop() {
       }
       if (direct == TSD_REQUEST && (millis() - touchLongPress >= TS_LONGPRESS_MS)) {
         #ifdef TOUCHMENU_ENABLE
-          if (display.mode()==PLAYER) touchmenu.open();   // menu rapide (la bascule radio <-> SD y est)
+          #ifdef TS_MENU_LONGPRESS
+            if (display.mode()==PLAYER) touchmenu.open();   // menu rapide par appui long (desactive : on utilise la zone en haut a gauche)
+          #endif
         #else
           controls.onBtnClick(EVT_BTN_MODE);   // radio <-> SD
         #endif
@@ -209,6 +246,17 @@ void TouchScreen::loop() {
         case TSD_LEFT:
         case TSD_RIGHT: {
             touchLongPress=millis();
+            #ifdef SLIDESHOW_ENABLE
+              if (slideshow.active()) {   // diaporama : volume direct, sans changer de page (la file d'affichage est videe a chaque tour)
+                slideshow.touchCancel();
+                int16_t xDeltaS = map(abs(touchVol - touchX), 0, _width, 0, TS_STEPS);
+                if (xDeltaS>1) {
+                  player.stepVol((touchVol - touchX)<0);
+                  touchVol = touchX;
+                }
+                break;
+              }
+            #endif
             if (display.mode()==PLAYER || display.mode()==VOL) {
               int16_t xDelta = map(abs(touchVol - touchX), 0, _width, 0, TS_STEPS);
               display.putRequest(NEWMODE, VOL);
@@ -222,9 +270,35 @@ void TouchScreen::loop() {
         case TSD_UP:
         case TSD_DOWN: {
             touchLongPress=millis();
+            #ifdef SLIDESHOW_ENABLE
+              if (slideshow.active()) slideshow.touchCancel();   // glissement en cours : ne pas arreter le diaporama
+            #endif
             #ifdef TOUCHMENU_ENABLE
               // PigTeam : ancienne liste de stations au glissement vertical supprimee,
-              // la selection se fait par le menu tactile (appui long > Stations)
+              // la selection se fait par le menu tactile (appui long > Stations).
+              // Le glissement vertical regle maintenant la luminosite : haut = plus clair,
+              // bas = plus sombre, toute la hauteur de l'ecran = 100 %.
+              #if BRIGHTNESS_PIN!=255
+                #ifdef SLIDESHOW_ENABLE
+                  const bool slideOn = slideshow.active();
+                #else
+                  const bool slideOn = false;
+                #endif
+                if ((display.mode()==PLAYER || slideOn) && config.store.dspon) {
+                  int16_t pct = ((int32_t)touchStation - (int32_t)touchY) * 100 / (int32_t)_height;
+                  if (pct != 0) {
+                    int16_t nb = (int16_t)config.store.brightness + pct;
+                    if (nb < TS_BRIGHTNESS_MIN) nb = TS_BRIGHTNESS_MIN;
+                    if (nb > 100) nb = 100;
+                    touchStation = touchY;
+                    if (nb != config.store.brightness) {
+                      config.store.brightness = (uint8_t)nb;
+                      config.setBrightness(false);   // applique tout de suite, sans ecrire en flash
+                      brightChanged = true;
+                    }
+                  }
+                }
+              #endif
               break;
             #endif
             if (display.mode()==PLAYER) {
@@ -255,6 +329,21 @@ void TouchScreen::loop() {
       #endif
       #ifdef SLIDESHOW_ENABLE
         slideshow.touchEnd();
+      #endif
+      #ifdef TOUCHMENU_ENABLE
+        if (cornerTap) {
+          cornerTap = false;
+          if (millis() - touchLongPress >= 50 && display.mode()==PLAYER) touchmenu.open();   // appui franc dans la zone : menu rapide
+        }
+      #endif
+      #if BRIGHTNESS_PIN!=255
+        if (brightChanged) {
+          brightChanged = false;
+          config.setBrightness(true);   // sauvegarde (differee) de la nouvelle luminosite
+          #if DSP_DIMMING_ENABLED
+            backlightControls.restart();  // relance le delai d'attenuation
+          #endif
+        }
       #endif
       if (direct == TSD_REQUEST) {
         uint32_t pressTicks = millis()-touchLongPress;
