@@ -163,7 +163,7 @@ Haut-parleur 4 à 8 Ω. **Grésillements** constatés au début : causés par de
 - [ ] Souder le câblage du MAX98357, tester en 5 V ; version autonome (LiPo + Lipo Rider Plus + haut-parleur).
 - [ ] Brancher une LiPo et étalonner la batterie ; tester la luminosité (PWM GPIO 16).
 - [x] Tiny + ILI9488 : son, SD + diaporama, luminosité, réveil, arrêt programmé et `uploadfs` validés (12 nov. 2026).
-- [ ] Tiny + ILI9488 : brancher une LiPo et étalonner la batterie (GPIO 9).
+- [ ] Tiny + ILI9488 : brancher une LiPo et étalonner la batterie (GPIO 9). (la mesure est **désactivée** dans `myoptions.h` tant qu'il n'y a pas de batterie : décommenter `BATTERY_PIN`).
 - [ ] Envoyer l'issue à trip5 (`ISSUE_trip5_ESPFileUpdater.md`).
 - [ ] Sculpture de circuit en laiton (Ø 1 mm commandé) : idée de forme encore en réflexion ; objectif 1 ou 2 cadeaux pour Noël ; s'entraîner à souder le laiton (tiges, anneau, figure plate, puis 3D).
 - [ ] Choisir les stations préférées ; exporter playlist + Wi-Fi dans le dépôt.

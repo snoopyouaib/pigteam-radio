@@ -226,7 +226,8 @@ void handleSearch(AsyncWebServerRequest *request) {
       request->send(429, "text/plain", "Search task is already running.");
       return;
     }
-    if (ESP.getFreeHeap() <= MIN_MALLOC) {
+    // En lecture la memoire est trop juste : la tache de recherche arrete d'abord la radio, puis reverifie la memoire
+    if (player.status() != PLAYING && ESP.getFreeHeap() <= MIN_MALLOC) {
       request->send(503, "text/plain", "Insufficient heap for search task.");
       return;
     }
@@ -1007,6 +1008,19 @@ useHostname:
 void vTaskSearchRadioBrowser(void *pvParameters) {
   char* search_str = (char*)pvParameters;
   FUNCTIONLOG("Search", "Starting Radio Browser search. Search: %s", search_str);
+  if (player.status() == PLAYING) {                      // PigTeam : sans cela la memoire manque et rien ne remonte
+    FUNCTIONLOG("Search", "Arret de la lecture avant la recherche");
+    player.sendCommand({PR_STOP, 0});
+    vTaskDelay(pdMS_TO_TICKS(1500));
+  }
+  if (ESP.getFreeHeap() <= MIN_MALLOC) {
+    FUNCTIONLOG("Search", "[Error] Memoire insuffisante (%u octets) meme apres l'arret.", (unsigned)ESP.getFreeHeap());
+    netserver.requestOnChange(SEARCH_FAILED, 0);
+    delete[] search_str;
+    g_searchTaskHandle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
   SPIFFS.remove("/www/searchresults.json");
   // Check SPIFFS free space
   size_t freeSpace = SPIFFS.totalBytes() - SPIFFS.usedBytes();
