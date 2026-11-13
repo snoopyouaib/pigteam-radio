@@ -8,7 +8,7 @@
    a part ; la radio redemarre toute seule apres une restauration reussie. */
 class SdBackup {
   public:
-    bool   start(bool restore);     // faux si une operation est deja en cours
+    bool   start(bool restore, bool dataOnly = false);   // faux si une operation est deja en cours ; dataOnly : ne restaure que les donnees (playlist, wifi, pense-bete), pas les pages web
     bool   busy() const { return _busy; }
     String statusJson();
   private:
@@ -16,6 +16,7 @@ class SdBackup {
     volatile bool _ok = true;
     String _msg;
     bool _restore = false;
+    bool _dataOnly = false;
     static void _task(void* arg);
     void _run();
     void _finish(bool ok, const String& msg);

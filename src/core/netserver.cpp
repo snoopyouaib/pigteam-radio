@@ -293,6 +293,7 @@ void handleSdBackup(AsyncWebServerRequest *request) {
   if (request->method() == HTTP_POST && request->hasParam("action", true)) {
     const String a = request->getParam("action", true)->value();
     if (a == "backup" || a == "restore") sdbackup.start(a == "restore");
+    else if (a == "restoredata") sdbackup.start(true, true);   // sans les pages web
   }
   request->send(200, "application/json", sdbackup.statusJson());
 }

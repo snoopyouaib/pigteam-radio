@@ -8,7 +8,9 @@
   :root { color-scheme: dark; }
   body { font-family: system-ui, sans-serif; background: #14161a; color: #e8eaed; margin: 0; padding: 16px; }
   main { max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 1.4rem; margin: 0 0 12px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+  a.back { background: #1f2329; color: #8ab4f8; text-decoration: none; border-radius: 16px; padding: 7px 14px; font-weight: 600; white-space: nowrap; }
   h2 { font-size: 1.05rem; margin: 22px 0 8px; color: #9aa0a6; font-weight: 600; }
   .card { background: #1f2329; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
@@ -35,7 +37,7 @@
 </head>
 <body>
 <main>
-  <h1>📝 Pense-bête</h1>
+  <header><h1>📝 Pense-bête</h1><a class="back" href="/">← Radio</a></header>
 
   <div class="card">
     <label><input type="checkbox" id="show"> Afficher les 3 prochains événements sur la radio, à la place de la météo</label>
@@ -65,21 +67,12 @@
 
   <div class="card">
     <h2 style="margin-top:0">Sauvegarde</h2>
-    <div class="hint">La liste est stockée dans la mémoire flash de la radio : un <b>uploadfs l'efface</b>. Copie ce texte dans un fichier avant, et colle-le ici pour restaurer.</div>
+    <div class="hint">La liste est stockée dans la mémoire flash de la radio : un <b>uploadfs l'efface</b>. Copie ce texte dans un fichier avant, et colle-le ici pour restaurer. Pour tout sauvegarder d'un coup sur la SD : page <a href="/outils.html" style="color:#8ab4f8">Outils</a>.</div>
     <textarea id="csv" spellcheck="false"></textarea>
     <div class="row"><button class="sec" id="export">Mettre à jour le texte</button><button id="import">Restaurer depuis ce texte</button></div>
     <div class="hint">Format : <code>AAAA-MM-JJ;HH:MM;annuel(1/0);texte</code> (heure facultative).</div>
   </div>
 
-  <div class="card">
-    <h2 style="margin-top:0">Sauvegarde de toute la radio sur la carte SD</h2>
-    <div class="hint">Copie <b>tous</b> les fichiers de la mémoire flash (pages web, playlist, Wi-Fi, pense-bête…) dans le dossier <code>/backup</code> de la SD, ou les remet en place. Après une restauration, la radio redémarre. Attention : le fichier Wi-Fi est copié en clair sur la SD.</div>
-    <div class="row">
-      <button id="sdb">Exporter vers la SD</button>
-      <button class="sec" id="sdr">Restaurer depuis la SD</button>
-    </div>
-    <div id="sdmsg" class="hint"></div>
-  </div>
 </main>
 
 <script>
@@ -155,22 +148,6 @@ $('import').onclick = async () => {
   try { csvEdited = false; apply(await post({ csv: $('csv').value })); say('Liste restaurée.'); }
   catch (e) { say('Échec : ' + e.message, true); }
 };
-async function sdStatus() {
-  try {
-    const st = await (await fetch('/sdbackup')).json();
-    $('sdmsg').textContent = st.msg || '';
-    $('sdmsg').style.color = st.busy ? '#fdd663' : (st.ok ? '#81c995' : '#f28b82');
-    $('sdb').disabled = $('sdr').disabled = !!st.busy;
-    if (st.busy) setTimeout(sdStatus, 1000);
-    else if (st.msg && st.msg.startsWith('Restauration') && st.ok) setTimeout(() => location.reload(), 12000);
-  } catch (e) { setTimeout(sdStatus, 3000); }   // la radio redemarre : on reessaie
-}
-async function sdAction(action) {
-  await fetch('/sdbackup', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action }) });
-  sdStatus();
-}
-$('sdb').onclick = () => { if (confirm('Copier tous les fichiers de la radio vers la SD (/backup) ?')) sdAction('backup'); };
-$('sdr').onclick = () => { if (confirm('Remplacer les fichiers de la radio par ceux de la SD (/backup), puis redémarrer ?')) sdAction('restore'); };
 $('d').value = todayStr();
 load();
 setInterval(load, 60000);   // l'aperçu suit la date et l'heure

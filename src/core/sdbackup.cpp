@@ -70,11 +70,12 @@ static bool copyFile(fs::FS& sfs, const String& sp, fs::FS& dfs, const String& d
   return ok;
 }
 
-bool SdBackup::start(bool restore) {
+bool SdBackup::start(bool restore, bool dataOnly) {
   if (_busy) return false;
   _busy = true;
   _ok = true;
   _restore = restore;
+  _dataOnly = restore && dataOnly;
   _msg = restore ? "Restauration en cours..." : "Sauvegarde en cours...";
   if (xTaskCreate(_task, "sdbackup", 8192, this, 1, NULL) != pdPASS) {
     _busy = false;
@@ -145,11 +146,15 @@ void SdBackup::_run() {
     for (const Entry& e : list) {
       if (!e.path.startsWith(BACKUP_DIR "/")) continue;
       String dst = e.path.substring(prefix);
+      if (_dataOnly) {                                    // donnees seulement : /data/* (sauf le fichier de version) et /memo.csv
+        const bool isData = (dst.startsWith("/data/") && dst != VERSION_PATH) || dst == "/memo.csv";
+        if (!isData) continue;
+      }
       if (copyFile(sdman, e.path, SPIFFS, dst, false, buf, BS)) { files++; bytes += e.size; }
       else { errors++; FUNCTIONLOG("SdBackup", "echec : %s", dst.c_str()); }
     }
     ok = (errors == 0 && files > 0);
-    msg = "Restauration : " + String(files) + " fichier(s), " + String((bytes + 512) / 1024) + " Ko depuis SD:" BACKUP_DIR;
+    msg = String(_dataOnly ? "Restauration des donnees : " : "Restauration : ") + String(files) + " fichier(s), " + String((bytes + 512) / 1024) + " Ko depuis SD:" BACKUP_DIR;
     if (errors) msg += " (" + String(errors) + " erreur(s))";
     if (!files) msg = "Sauvegarde vide ou illisible";
     memo.reload();
@@ -174,7 +179,7 @@ String SdBackup::statusJson() {
 }
 
 #else   // carte sans lecteur SD : fonction inactive
-bool SdBackup::start(bool) { _msg = "Pas de lecteur SD sur cette carte"; _ok = false; return false; }
+bool SdBackup::start(bool, bool) { _msg = "Pas de lecteur SD sur cette carte"; _ok = false; return false; }
 String SdBackup::statusJson() { return "{\"busy\":0,\"ok\":0,\"msg\":\"Pas de lecteur SD sur cette carte\"}"; }
 #endif
 

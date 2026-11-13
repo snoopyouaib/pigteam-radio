@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outils</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background: #14161a; color: #e8eaed; margin: 0; padding: 16px; }
+  main { max-width: 640px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; color: #9aa0a6; font-weight: 600; }
+  a.back { background: #1f2329; color: #8ab4f8; text-decoration: none; border-radius: 16px; padding: 7px 14px; font-weight: 600; white-space: nowrap; }
+  .card { background: #1f2329; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  label { display: flex; align-items: center; gap: 6px; }
+  select, input[type=time] { background: #14161a; color: inherit; border: 1px solid #3c4043; border-radius: 6px; padding: 8px; font: inherit; }
+  select { max-width: 100%; }
+  button { background: #2d6cdf; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font: inherit; cursor: pointer; }
+  button.sec { background: #3c4043; }
+  button:disabled { opacity: .5; cursor: default; }
+  code { background: #14161a; padding: 1px 5px; border-radius: 4px; }
+  button.stop { background: #c5443b; }
+  .days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .days label { background: #14161a; border: 1px solid #3c4043; border-radius: 16px; padding: 5px 11px; cursor: pointer; }
+  .days input { display: none; }
+  .days label:has(input:checked) { background: #2d6cdf; border-color: #2d6cdf; color: #fff; }
+  input[type=range] { flex: 1 1 160px; accent-color: #2d6cdf; }
+  .hint { font-size: .8rem; color: #9aa0a6; }
+  #state { font-size: .8rem; color: #9aa0a6; margin: 0 0 10px; }
+  #state.ok { color: #81c995; }
+  #sleepleft { font-variant-numeric: tabular-nums; color: #fdd663; }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>🛠 Outils</h1><a class="back" href="/">← Radio</a></header>
+  <div id="state">Connexion à la radio…</div>
+
+  <div class="card">
+    <h2>⏰ Réveil</h2>
+    <div class="row"><label><input type="checkbox" id="alarmon"> Réveil activé</label>
+      <input type="time" id="alarmtime" value="07:00"></div>
+    <div class="row days" id="days">
+      <label><input type="checkbox" data-d="1">L</label><label><input type="checkbox" data-d="2">M</label>
+      <label><input type="checkbox" data-d="3">M</label><label><input type="checkbox" data-d="4">J</label>
+      <label><input type="checkbox" data-d="5">V</label><label><input type="checkbox" data-d="6">S</label>
+      <label><input type="checkbox" data-d="0">D</label>
+    </div>
+    <div class="row"><label>Station <select id="alarmstation"><option value="0">Dernière station écoutée</option></select></label></div>
+    <div class="row"><label style="flex:1">Volume <input type="range" id="alarmvol" min="0" max="42" value="0"> <span id="alarmvolinfo">0</span></label></div>
+    <div class="hint">Le volume monte progressivement pendant 30 secondes.</div>
+  </div>
+
+  <div class="card">
+    <h2>⏳ Arrêt programmé</h2>
+    <div class="row">
+      <select id="sleeptimer">
+        <option value="0">Non</option><option value="15">Dans 15 min</option><option value="30">Dans 30 min</option>
+        <option value="60">Dans 60 min</option><option value="90">Dans 90 min</option>
+      </select>
+      <span id="sleepleft"></span>
+    </div>
+    <div class="hint">Le volume baisse doucement pendant les 2 dernières minutes, puis la radio s'arrête.</div>
+  </div>
+
+  <div class="card">
+    <h2>🖼 Diaporama (carte SD, dossier /photos)</h2>
+    <div class="row">
+      <label>Durée par photo
+        <select id="slidesecs"><option value="5">5 s</option><option value="8" selected>8 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option></select>
+      </label>
+      <label><input type="checkbox" id="slidernd"> Aléatoire</label>
+    </div>
+    <div class="row"><button id="slidebtn" type="button">🖼 Lancer le diaporama</button></div>
+    <div class="hint">Un toucher sur l'écran de la radio arrête le diaporama.</div>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">💾 Sauvegarde de la radio sur la SD</h2>
+    <div class="hint">Copie <b>tous</b> les fichiers de la mémoire flash (pages web, playlist, Wi-Fi, pense-bête…) dans le dossier <code>/backup</code> de la SD, ou les remet en place. <b>Restaurer les données</b> ne remet que la playlist, le Wi-Fi et le pense-bête (à utiliser après un <code>uploadfs</code>) ; « Tout restaurer » remet aussi les pages web. Après une restauration, la radio redémarre. Attention : le fichier Wi-Fi est copié en clair sur la SD.</div>
+    <div class="row">
+      <button id="sdb">Exporter vers la SD</button>
+      <button id="sdd">Restaurer les données</button>
+      <button class="sec" id="sdr">Tout restaurer (avec pages web)</button>
+    </div>
+    <div id="sdmsg" class="hint"></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let ws, retry = 0, slideOn = 0, sleepEnd = 0, A = {on:0,h:7,m:0,days:0x3E,sta:0,vol:0,volmax:42};
+const pad = n => String(n).padStart(2, '0');
+const send = s => { if (ws && ws.readyState === 1) ws.send(s); };
+
+function renderAlarm() {
+  $('alarmon').checked = !!A.on;
+  $('alarmtime').value = pad(A.h) + ':' + pad(A.m);
+  document.querySelectorAll('#days input').forEach(c => { c.checked = !!((A.days >> +c.dataset.d) & 1); });
+  $('alarmvol').max = A.volmax; $('alarmvol').value = A.vol; $('alarmvolinfo').textContent = A.vol;
+  const s = $('alarmstation');
+  if (![...s.options].some(o => o.value === String(A.sta))) s.add(new Option('Station ' + A.sta, A.sta));
+  s.value = String(A.sta);
+}
+function renderSleepLeft() {
+  const left = Math.max(0, Math.round((sleepEnd - Date.now()) / 1000));
+  $('sleepleft').textContent = sleepEnd ? pad(Math.floor(left / 60)) + ':' + pad(left % 60) : '';
+}
+function setSleepLeft(sec) { sleepEnd = sec > 0 ? Date.now() + sec * 1000 : 0; renderSleepLeft(); }
+setInterval(renderSleepLeft, 1000);
+
+function renderSlide() {
+  $('slidebtn').textContent = slideOn ? '⏹ Arrêter le diaporama' : '🖼 Lancer le diaporama';
+  $('slidebtn').className = slideOn ? 'stop' : '';
+  if (slideOn) {
+    if (![...$('slidesecs').options].some(o => o.value === String(slideOn))) $('slidesecs').add(new Option(slideOn + ' s', slideOn));
+    $('slidesecs').value = String(slideOn);
+  }
+}
+function onData(d) {
+  if (d.alarmon !== undefined) { A = {on:d.alarmon,h:d.alarmh,m:d.alarmm,days:d.alarmdays,sta:d.alarmsta,vol:d.alarmvol,volmax:d.alarmvolmax || A.volmax}; renderAlarm(); }
+  if (d.slideshow !== undefined) { slideOn = +d.slideshow || 0; renderSlide(); }
+  if (d.slideshowrand !== undefined) $('slidernd').checked = !!(+d.slideshowrand);
+  if (d.sleeptimer !== undefined) {
+    const sel = $('sleeptimer'), v = String(d.sleeptimer);
+    if (![...sel.options].some(o => o.value === v)) sel.add(new Option('Dans ' + v + ' min', v));
+    sel.value = v;
+  }
+  if (d.sleepleft !== undefined) setSleepLeft(+d.sleepleft || 0);
+}
+function connect() {
+  ws = new WebSocket('ws://' + location.host + '/ws');
+  ws.onopen = () => { retry = 0; $('state').textContent = 'Connecté à la radio'; $('state').className = 'ok'; send('getindex=1'); };
+  ws.onmessage = e => { try { const d = JSON.parse(e.data); if (d && !Array.isArray(d)) onData(d); } catch (x) {} };
+  ws.onclose = () => { $('state').textContent = 'Connexion perdue, nouvel essai…'; $('state').className = ''; setTimeout(connect, ++retry < 10 ? 2000 : 30000); };
+}
+async function loadStations() {
+  try {
+    const t = await (await fetch('/data/playlist.csv?' + Date.now())).text();
+    const s = $('alarmstation');
+    t.split(/\r?\n/).filter(l => l.trim()).forEach((l, i) => s.add(new Option((i + 1) + ' - ' + l.split('\t')[0].trim(), i + 1)));
+    s.value = String(A.sta);
+  } catch (e) {}
+}
+
+$('alarmon').onchange = e => send('alarmon=' + (e.target.checked ? 1 : 0));
+$('alarmtime').onchange = e => { if (e.target.value) send('alarmtime=' + e.target.value); };
+$('alarmstation').onchange = e => send('alarmstation=' + e.target.value);
+$('alarmvol').oninput = e => { $('alarmvolinfo').textContent = e.target.value; };
+$('alarmvol').onchange = e => send('alarmvol=' + e.target.value);
+$('days').onchange = () => { let m = 0; document.querySelectorAll('#days input').forEach(c => { if (c.checked) m |= 1 << +c.dataset.d; }); send('alarmdays=' + m); };
+$('sleeptimer').onchange = e => send('sleeptimer=' + e.target.value);
+$('slidesecs').onchange = e => { if (slideOn) send('slideshow=' + e.target.value); };
+$('slidernd').onchange = e => send('slideshowrand=' + (e.target.checked ? 1 : 0));
+$('slidebtn').onclick = () => {
+  if (!slideOn) send('slideshowrand=' + ($('slidernd').checked ? 1 : 0));
+  send('slideshow=' + (slideOn ? 0 : $('slidesecs').value));
+};
+async function sdStatus() {
+  try {
+    const st = await (await fetch('/sdbackup')).json();
+    $('sdmsg').textContent = st.msg || '';
+    $('sdmsg').style.color = st.busy ? '#fdd663' : (st.ok ? '#81c995' : '#f28b82');
+    $('sdb').disabled = $('sdr').disabled = $('sdd').disabled = !!st.busy;
+    if (st.busy) setTimeout(sdStatus, 1000);
+    else if (st.msg && st.msg.startsWith('Restauration') && st.ok) setTimeout(() => location.reload(), 12000);
+  } catch (e) { setTimeout(sdStatus, 3000); }   // la radio redemarre : on reessaie
+}
+async function sdAction(action) {
+  await fetch('/sdbackup', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action }) });
+  sdStatus();
+}
+$('sdb').onclick = () => { if (confirm('Copier tous les fichiers de la radio vers la SD (/backup) ?')) sdAction('backup'); };
+$('sdd').onclick = () => { if (confirm('Remettre playlist, Wi-Fi et pense-bête depuis la SD (/backup), sans toucher aux pages web, puis redémarrer ?')) sdAction('restoredata'); };
+$('sdr').onclick = () => { if (confirm('Remplacer les fichiers de la radio par ceux de la SD (/backup), puis redémarrer ?')) sdAction('restore'); };
+loadStations(); connect();
+</script>
+</body>
+</html>

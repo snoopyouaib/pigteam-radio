@@ -257,6 +257,7 @@ bool CommandHandler::exec(const char *command, const char *value, uint8_t cid, C
   /* Options: Weather */
   if (cmdIs(command, "sdbackup"))      { sdbackup.start(false); return true; }   // flash (SPIFFS) -> SD:/backup
   if (cmdIs(command, "sdrestore"))     { sdbackup.start(true);  return true; }   // SD:/backup -> flash, puis redemarrage
+  if (cmdIs(command, "sdrestoredata")) { sdbackup.start(true, true); return true; } // idem mais sans les pages web (playlist, wifi, pense-bete)
   if (cmdIs(command, "memoshow"))      {   // pense-bete a la place de la meteo (page /memo.html)
     config.saveValue(&config.store.showmemo, static_cast<bool>(atoi(value)));
     network.forceWeather = true;

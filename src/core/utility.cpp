@@ -644,7 +644,7 @@ void Utility::cleanupSpiffs() {
       #endif
       if (name == currentLocaleGz || name == currentLocale) {
         keep = true;
-      } else if (name == "memo.html" || name == "memo.html.gz") {   // PigTeam : page du pense-bete (absente de la liste d'ehRadio)
+      } else if (name == "memo.html" || name == "memo.html.gz" || name == "outils.html" || name == "outils.html.gz") {   // PigTeam : page du pense-bete (absente de la liste d'ehRadio)
         keep = true;
       } else {
         for (size_t i = 0; i < Config::wwwFilesCount; i++) {

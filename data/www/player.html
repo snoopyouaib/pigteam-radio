@@ -19,7 +19,7 @@
         </svg>
     </div>
   </div><!--logow-->
-  <div>
+  <div id="nowplaying">
     <div id="nameset" class="text"></div>
     <div id="meta" class="text"></div>
   </div>
@@ -130,51 +130,12 @@
           <path id="a" d="m4 17c-0.55228 0-1-0.44772-1-1s0.44772-1 1-1h2l3-3-3-3h-2c-0.55 0-1-0.44755-1-0.99877 0-0.55123 0.45-1.0012 1-1.0012h3l4 4 4-4h2v-2l4 3.0012-4 2.9988v-2h-1l-3 3 3 3h1v-2l4 3-4 3v-2h-2l-4-4-4 4z" fill-rule="evenodd"/>
         </svg>
       </div>
-      <div class="infoitem" id="sleepinfo">
-        <select id="sleeptimer" data-command="sleeptimer">
-          <option value="0">Arrêt programmé : non</option>
-          <option value="15">Arrêt dans 15 min</option>
-          <option value="30">Arrêt dans 30 min</option>
-          <option value="60">Arrêt dans 60 min</option>
-          <option value="90">Arrêt dans 90 min</option>
-        </select>
-        <span id="sleepleft"></span>
-      </div>
-      <div class="infoitem hidden" id="slideinfo">
-        <select id="slidesecs">
-          <option value="5">5 s</option>
-          <option value="8" selected>8 s</option>
-          <option value="15">15 s</option>
-          <option value="30">30 s</option>
-          <option value="60">60 s</option>
-        </select>
-        <label class="slidernd"><input type="checkbox" id="slidernd"> Aléatoire</label>
-        <button id="slidebtn" type="button">🖼 Diaporama</button>
-      </div>
       <div class="infoitem" id="rsiinfo"><span data-i18n="lbl_rssi">RSSI</span>: <span id="rssi" class="text">-</span><span data-i18n="unit_dbm">dBm</span></div>
       <div class="infoitem hidden" id="batteryinfo"><span id="battery" class="text"></span></div>
     </div>
-    <details id="alarmwrap">
-      <summary>⏰ Réveil <span id="alarmsummary"></span></summary>
-      <div id="alarmbody">
-        <label class="alarmrow"><input type="checkbox" id="alarmon"> Réveil activé</label>
-        <label class="alarmrow">Heure <input type="time" id="alarmtime" value="07:00"></label>
-        <div class="alarmrow" id="alarmdays">
-          <label><input type="checkbox" id="alarmday1">L</label>
-          <label><input type="checkbox" id="alarmday2">M</label>
-          <label><input type="checkbox" id="alarmday3">M</label>
-          <label><input type="checkbox" id="alarmday4">J</label>
-          <label><input type="checkbox" id="alarmday5">V</label>
-          <label><input type="checkbox" id="alarmday6">S</label>
-          <label><input type="checkbox" id="alarmday0">D</label>
-        </div>
-        <label class="alarmrow">Station <select id="alarmstation"><option value="0">Dernière station écoutée</option></select></label>
-        <label class="alarmrow">Volume <input type="range" id="alarmvol" min="0" max="42" value="0"> <span id="alarmvolinfo">0</span></label>
-        <div class="alarmhint">Le volume monte progressivement pendant 1 minute.</div>
-      </div>
-    </details>
     <ul id="playlist"></ul>
   </div><!--equalizerwrap-->
+  <div id="memolink"><a href="/outils.html">🛠 Outils</a> <a href="/memo.html">📌 Pense-bête</a></div>
   <div id="copy">powered by <a target="_blank" href="https://trip5.github.io/ehRadio/">ehRadio</a> |
     <span id="version"></span>
     <span id="update_available" class="hidden">| <a href="/update.html" data-i18n="msg_update_available">Update Available</a></span>

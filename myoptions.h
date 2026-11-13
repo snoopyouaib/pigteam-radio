@@ -95,7 +95,7 @@
 
   #define BRIGHTNESS_PIN        6
   #define DSP_DIMMING_ENABLED   true
-  #define BATTERY_PIN           9
+  // #define BATTERY_PIN           9   /* pas de batterie pour l'instant (a decommenter une fois la LiPo branchee, sinon l'ADC flottant affiche une fausse batterie) */
   #define BATTERY_DIVIDER_RATIO 2.0
 
   #define SPIB_SCK      15
