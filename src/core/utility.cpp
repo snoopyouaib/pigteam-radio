@@ -644,6 +644,8 @@ void Utility::cleanupSpiffs() {
       #endif
       if (name == currentLocaleGz || name == currentLocale) {
         keep = true;
+      } else if (name == "memo.html" || name == "memo.html.gz") {   // PigTeam : page du pense-bete (absente de la liste d'ehRadio)
+        keep = true;
       } else {
         for (size_t i = 0; i < Config::wwwFilesCount; i++) {
           if (name == String(Config::wwwFiles[i]) || name == String(Config::wwwFiles[i]) + ".gz") {
@@ -661,6 +663,8 @@ void Utility::cleanupSpiffs() {
           continue;
         }
       }
+    } else if (path == "/memo.csv") {                       // PigTeam : liste du pense-bete (a la racine)
+      keep = true;
     } else if (path.startsWith("/data/")) {
       String name = path.substring(6);
       for (size_t i = 0; i < Config::dataFilesCount; i++) {

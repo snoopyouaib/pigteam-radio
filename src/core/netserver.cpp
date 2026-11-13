@@ -19,6 +19,8 @@
 #include "mqtt.h"
 #include "netserver.h"
 #include "network.h"
+#include "memo.h"
+#include "sdbackup.h"
 #include "player.h"
 #include "telnet.h"
 #include "utility.h"
@@ -272,6 +274,29 @@ void handleReady(AsyncWebServerRequest *request) {
   request->send(response);
 }
 
+/* Pense-bete : GET /memo = liste + etat (JSON) ; POST /memo avec "csv" (liste complete) et/ou "show" (0/1) */
+void handleMemo(AsyncWebServerRequest *request) {
+  if (request->method() == HTTP_POST) {
+    if (request->hasParam("csv", true)) {
+      if (!memo.setFromCsv(request->getParam("csv", true)->value())) { request->send(500, "text/plain", "Ecriture impossible"); return; }
+      if (config.store.showmemo) network.buildWeatherString();
+    }
+    if (request->hasParam("show", true)) {
+      cmd.exec("memoshow", request->getParam("show", true)->value() == "1" ? "1" : "0", 0, CommandSource::HttpUrl);
+    }
+  }
+  request->send(200, "application/json", memo.toJson());
+}
+
+/* Sauvegarde / restauration flash <-> SD : GET /sdbackup = etat ; POST /sdbackup action=backup|restore */
+void handleSdBackup(AsyncWebServerRequest *request) {
+  if (request->method() == HTTP_POST && request->hasParam("action", true)) {
+    const String a = request->getParam("action", true)->value();
+    if (a == "backup" || a == "restore") sdbackup.start(a == "restore");
+  }
+  request->send(200, "application/json", sdbackup.statusJson());
+}
+
 void handleSearchPost(AsyncWebServerRequest *request) {
   // handle preview or add to playlist
   bool addtoplaylist = false;
@@ -382,6 +407,10 @@ bool NetServer::begin(bool quiet) {
   });
   webserver.on("/search", HTTP_GET, handleSearch);
   webserver.on("/search", HTTP_POST, handleSearchPost);
+  webserver.on("/memo", HTTP_GET, handleMemo);
+  webserver.on("/memo", HTTP_POST, handleMemo);
+  webserver.on("/sdbackup", HTTP_GET, handleSdBackup);
+  webserver.on("/sdbackup", HTTP_POST, handleSdBackup);
 
   // Captive portal detection ??redirect probes from iOS, Android, Windows to the web UI
   auto captiveRedirect = [](AsyncWebServerRequest *request) { request->redirect("/"); };

@@ -25,6 +25,8 @@
 
 extern const char batterytxtFmt[] PROGMEM;
 
+/* meteo ou pense-bete : meme ligne defilante */
+#define WEATHERWIDGET_ON (config.store.showweather || config.store.showmemo)
 #ifndef IP_WEATHER_SHARED
   #define IP_WEATHER_SHARED false
 #endif
@@ -369,8 +371,8 @@ void Display::_start() {
   
   if (_bufferbar)  _bufferbar->lock(!config.store.bufferbar);
   
-  if (_weather)  _weather->lock(!config.store.showweather);
-  if (_weather && config.store.showweather && network.status != SDOFFLINE) network.buildWeatherString();
+  if (_weather)  _weather->lock(!WEATHERWIDGET_ON);
+  if (_weather && WEATHERWIDGET_ON && network.status != SDOFFLINE) network.buildWeatherString();
 
   if (_clock && network.status == SDOFFLINE && !config.isRTCFound()) {
     _clock->lock(true);   // prevent redraws from CLOCK → _time()
@@ -400,7 +402,7 @@ void Display::_start() {
         _volip->setText(utf8_trim15(l10n(L10N_MSG_OFFLINE_15CHAR)), "\030\031%s");
       } else {
         #if IP_WEATHER_SHARED
-          if (config.store.showweather) _volip->setText("");
+          if (WEATHERWIDGET_ON) _volip->setText("");
           else _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
         #else
           _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
@@ -469,7 +471,7 @@ void Display::_swichMode(displayMode_e newmode) {
           _volip->setText(utf8_trim15(l10n(L10N_MSG_OFFLINE_15CHAR)), "\030\031%s");
         } else {
           #if IP_WEATHER_SHARED // weather and IP share the same bottom row; hide IP when weather is active
-            if (config.store.showweather) _volip->setText("");
+            if (WEATHERWIDGET_ON) _volip->setText("");
             else _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
           #else
             _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
@@ -477,7 +479,7 @@ void Display::_swichMode(displayMode_e newmode) {
         }
       }
     #if IP_WEATHER_SHARED // force weather repaint on return to PLAYER; larger displays repaint naturally
-      if (config.store.showweather && _weather) {
+      if (WEATHERWIDGET_ON && _weather) {
         _weather->lock(false);
         // Force a clean repaint of the shared weather/IP row after overlays like VOL/SCREENSAVER.
         _weather->setText("");
@@ -517,7 +519,7 @@ void Display::_swichMode(displayMode_e newmode) {
   }
   if (newmode == VOL) {
     #if IP_WEATHER_SHARED // weather and IP share the same bottom row; pause weather so VOL can show IP
-      if (config.store.showweather && _weather) {
+      if (WEATHERWIDGET_ON && _weather) {
         // Pause weather updates while volume UI is active to avoid shared-line collisions.
         _weather->lock(true);
         _weather->setText("");
@@ -710,11 +712,11 @@ void Display::loop() {
         }
         case SHOWWEATHER: {
           #if IP_WEATHER_SHARED // also lock weather during VOL to prevent shared-row collision with IP
-            if (_weather) _weather->lock(!config.store.showweather || _mode == VOL);
+            if (_weather) _weather->lock(!WEATHERWIDGET_ON || _mode == VOL);
           #else
-            if (_weather) _weather->lock(!config.store.showweather);
+            if (_weather) _weather->lock(!WEATHERWIDGET_ON);
           #endif
-          if (!config.store.showweather) {
+          if (!WEATHERWIDGET_ON) {
             if (_weather) _weather->setText("");
             if (_volip) _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
           } else {
@@ -770,7 +772,7 @@ void Display::loop() {
                 _volip->setText(utf8_trim15(l10n(L10N_MSG_OFFLINE_15CHAR)), "\030\031%s");
               } else {
                 #if IP_WEATHER_SHARED // skip IP repaint in PLAYER when weather owns the shared row
-                  if (!(_mode == PLAYER && config.store.showweather))
+                  if (!(_mode == PLAYER && WEATHERWIDGET_ON))
                 #endif
                 _volip->setText(utility.ipToStr(WiFi.localIP()), iptxtFmt);
               }
@@ -1134,7 +1136,7 @@ void Display::_applyState() {
   if (_vuwidget && !config.store.vumeter) _vuwidget->lock();  // keep VU off when disabled
   _volume();
   if (_battery) _updateBattery();
-  if (_weather && config.store.showweather && network.weatherBuf) _weather->setText(network.weatherBuf);
+  if (_weather && WEATHERWIDGET_ON && network.weatherBuf) _weather->setText(network.weatherBuf);
   _station();
   _title();
   putRequest(NEWMODE, CLEAR);

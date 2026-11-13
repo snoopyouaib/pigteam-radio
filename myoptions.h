@@ -2,14 +2,13 @@
 #define myoptions_h
 
 /* ------------------------------------------------------------------
-   ehRadio - PigTeam - 5 cartes, choisies par l'environnement PlatformIO :
+   ehRadio - PigTeam - 4 cartes, choisies par l'environnement PlatformIO :
      ehradio_s3_n16r8      : ESP32-S3 N16R8 + ecran au choix (voir ECRAN) + PCM5102
      ehradio_s3_zero_tft   : ESP32-S3-Zero N8R8 + ILI9488 480x320 tactile + SD + PCM5102
-     ehradio_s3_zero       : ESP32-S3-Zero 4 Mo + OLED 1,3" + rotatif + 2 boutons
      ehradio_s3_tiny_tft   : ESP32-S3-Tiny N8R8 + TFT ST7789 + rotatif + BACK
      ehradio_s3_tiny_ili9488 : ESP32-S3-Tiny N8R8 + ILI9488 480x320 tactile + SD + PCM5102 (comme le N16R8)
 
-   Commandes des cartes SANS tactile (Zero et Tiny) :
+   Commandes des cartes SANS tactile (Tiny TFT) :
      rotatif : tourner = volume
                clic    = ouvrir la liste des stations (patch controls.cpp, voir ENC_CLICK_OPENS_LIST)
                dans la liste : tourner = choisir, clic = valider et sortir
@@ -53,35 +52,6 @@
   #define SPIB_MISO     44
   #define SD_SPI        'B'
   #define SD_CS         3
-
-  #define I2S_DOUT      4             /* PCM5102 DIN */
-  #define I2S_BCLK      5             /* PCM5102 BCK */
-  #define I2S_LRC       6             /* PCM5102 LCK */
-  #define VS1053_CS     255
-#elif defined(CARTE_ZERO)
-/* ------------------------------------------------------------------
-   Env ehradio_s3_zero : ESP32-S3-Zero (4 Mo flash, 2 Mo PSRAM) soudee sur le
-   module OLED 1,3" + encodeur EC11 + 2 boutons (celui du chrono piste).
-   Cablage du module (meme brochage que le chrono piste) :
-     CONFIRM -> GPIO 7    OLED SDA -> GPIO 8    OLED SCL -> GPIO 9
-     PUSH    -> GPIO 10   CLK (A)  -> GPIO 11   DT (B)    -> GPIO 12
-     BACK    -> GPIO 13
-   PCM5102 : DIN -> GPIO 4, BCK -> GPIO 5, LCK -> GPIO 6
-   (GPIO 4/5/6 etaient la carte SD du chrono : libres ici)
-   Evites : 0 et 3 (strapping), 19/20 (USB natif).
-   ------------------------------------------------------------------ */
-  #define DSP_MODEL     DSP_SH1106    /* si image decalee/brouillee : DSP_SSD1306 */
-  #define I2C_SDA       8
-  #define I2C_SCL       9
-
-  /* Rotatif = encodeur 1 : tourner = volume, clic = liste des stations */
-  #define ENC_CLK       11
-  #define ENC_DT        12
-  #define ENC_SW        10
-  #define ENC_STEPS     4             /* EC11 : 4 transitions par cran (2 = saute de 2 stations par cran) */
-  #define ENC_CLICK_OPENS_LIST        /* clic rotatif = liste (necessite le patch controls.cpp) */
-  #define BTN_PLAY      7             /* CONFIRM : lecture / arret */
-  #define BTN_MODE      13            /* BACK : double-clic = muet, appui long = veille */
 
   #define I2S_DOUT      4             /* PCM5102 DIN */
   #define I2S_BCLK      5             /* PCM5102 BCK */

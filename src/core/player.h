@@ -21,13 +21,11 @@ struct playerRequestParams_t
 
 enum plStatus_e : uint8_t{ PLAYING = 1, STOPPED = 2 };
 
-/* Arret programme (sleep timer) : volume en fondu puis arret. Exclu de l'env Zero (flash presque plein). */
-#ifndef CARTE_ZERO
-  #define SLEEP_TIMER_ENABLE
-  #define SLEEP_FADE_MS 120000UL   // duree du fondu avant l'arret
-  #define ALARM_ENABLE            // reveil (heure, jours, station, volume progressif)
-  #define ALARM_RAMP_MS 30000UL   // duree de la montee progressive du volume
-#endif
+/* Arret programme (sleep timer) : volume en fondu puis arret. */
+#define SLEEP_TIMER_ENABLE
+#define SLEEP_FADE_MS 120000UL   // duree du fondu avant l'arret
+#define ALARM_ENABLE            // reveil (heure, jours, station, volume progressif)
+#define ALARM_RAMP_MS 30000UL   // duree de la montee progressive du volume
 
 class Player: public Audio {
   public:

@@ -1,6 +1,6 @@
-# 🎛️ Cartes Tiny TFT / S3-Zero OLED — config et commandes (ehRadio)
+# 🎛️ Cartes Tiny / S3-Zero TFT — config et commandes (ehRadio)
 
-> Complément de `REPRISE_PROJET_webradio.md` (qui décrit la N16R8). Dernière mise à jour : 12 novembre 2026 (ajout Tiny + ILI9488, correctif `uploadfs`).
+> Complément de `REPRISE_PROJET_webradio.md` (qui décrit la N16R8). Dernière mise à jour : 13 novembre 2026 (versions 4 Mo abandonnées et retirées) (ajout Tiny + ILI9488, correctif `uploadfs`).
 > Dépôt : `D:\vscode_projets\ehradio-pigteam` (privé, GitHub `snoopyouaib/ehradio-pigteam`, remotes `origin` + `upstream`). Un futur dépôt privé « radio-pigteam » est prévu (garder l'historique : `git remote rename origin ancien`, `git remote add origin ...`, `git push -u origin --all`, `git push origin --tags`). Pas de distribution prévue : usage perso (GPL v3 non contraignante sans diffusion).
 
 ## 📦 État
@@ -9,10 +9,9 @@
 |---|---|---|
 | ESP32-S3-Tiny N8R8 (8 Mo flash, PSRAM **octale** 8 Mo) + ST7789 320×240 + Lipo Rider Plus | `ehradio_s3_tiny_tft` | ✅ démarre, Wi-Fi, WebUI, fr_FR, Europe/Paris, météo FR, **son PCM5102 OK**, **son MAX98357 OK (en 3,3 V)**, commandes rotatif OK, **SD configurée (testée OK)**, **logo PigTeam rond au boot**, filtre des titres bidons OK, pas de tactile (normal) |
 | ESP32-S3-Tiny N8R8 + **ILI9488 480×320 tactile** + SD + PCM5102 (même firmware que la N16R8 : réveil, arrêt programmé, diaporama, menu tactile) | `ehradio_s3_tiny_ili9488` | ✅ **tout validé le 12 nov. 2026** : écran + tactile, Wi-Fi, WebUI, `uploadfs` non compressé, **son MAX98357A**, **SD** (21 MP3, mode SD) + **diaporama** (174 photos 480×320, ~330 ms chacune), **luminosité** (PWM GPIO 6), **arrêt programmé** et **réveil** (montée 0→25 en 30 s) ; reste la batterie (GPIO 9) |
-| ESP32-S3-Zero 4 Mo (N4R2, PSRAM quad) + OLED SH1106 + rotatif + 2 boutons | `ehradio_s3_zero` | ⏳ config prête, pas encore testée (1 carte fonctionne, 2 peut-être abîmées par la chaleur) |
 | ESP32-S3 N16R8 + ILI9341 / OLED | `ehradio_s3_n16r8` | ✅ voir doc de reprise |
 
-Un seul `myoptions.h` pour toutes les cartes : `-DCARTE_ZERO`, `-DCARTE_TINY_TFT`, `-DCARTE_TINY_ILI9488` (flags de l'env) choisissent la branche ; sans flag = n16r8 (`ECRAN_OLED 0/1`). VS Code grise les branches inactives : c'est normal (ce ne sont pas des commentaires).
+Un seul `myoptions.h` pour toutes les cartes : `-DCARTE_TINY_TFT`, `-DCARTE_TINY_ILI9488` (flags de l'env) choisissent la branche ; sans flag = n16r8 (`ECRAN_OLED 0/1`). VS Code grise les branches inactives : c'est normal (ce ne sont pas des commentaires).
 
 Cartes en stock (inventaire) : Waveshare ESP32-S3-DEV-KIT en N32R16V (module **WROOM-2** : flash et PSRAM **octales**, mode `opi_opi` + `flash_mode = opi` à prévoir, GPIO 26–37 interdits ; rien de préparé) ; un N8R8 du même modèle suffirait (même mémoire que la Tiny, `qio_opi`, `default_8MB.csv`).
 
@@ -111,7 +110,6 @@ Dans `D:\vscode_projets\pigteam-radio` (PowerShell), **moniteur série fermé**.
 | ESP32-S3-Tiny N8R8 + ILI9488 tactile | `ehradio_s3_tiny_ili9488` |
 | ESP32-S3-Tiny N8R8 + ST7789 + rotatif | `ehradio_s3_tiny_tft` |
 | ESP32-S3-Zero N8R8 + ILI9488 tactile | `ehradio_s3_zero_tft` |
-| ESP32-S3-Zero 4 Mo + OLED | `ehradio_s3_zero` |
 
 ```powershell
 pio run -e <env> -t uploadfs          # 1. pages web (carte neuve, ou si data\www a change) - D'ABORD
@@ -127,8 +125,8 @@ pio device monitor -e <env>           # 3. moniteur serie (Ctrl+C pour quitter)
 
 ## 🧱 Pièges de compilation / flash (Tiny)
 
-1. **Octal PSRAM** : `board_build.arduino.memory_type = qio_opi` (le N8R8 Tiny). Avec `qio_qspi` : `PSRAM: 0MB`, pas de serveur web, 4 Ko de heap libre. `qio_qspi` = uniquement la Zero 4 Mo (N4R2).
-2. **Partitions** : `default_8MB.csv` (Tiny), `default_16MB.csv` (N16R8), `builds/partitions/4MBflash-SPIFFS.csv` (Zero). Toujours préciser `-e <env>` (un mauvais env → « does not fit in flash » ou `uploadfs` en échec).
+1. **Octal PSRAM** : `board_build.arduino.memory_type = qio_opi` (le N8R8 Tiny). Avec `qio_qspi` : `PSRAM: 0MB`, pas de serveur web, 4 Ko de heap libre.
+2. **Partitions** : `default_8MB.csv` (Tiny), `default_16MB.csv` (N16R8). Toujours préciser `-e <env>` (un mauvais env → « does not fit in flash » ou `uploadfs` en échec).
 3. **Lib SD** : Adafruit ST7789 dépend de `SD` → PlatformIO installe le SD 1.3.0 du registre (incompatible ESP32-S3). Ligne dans `lib_deps` : `SD=file://${platformio.packages_dir}/framework-arduinoespressif32/libraries/SD`, puis supprimer `.pio\libdeps\ehradio_s3_tiny_tft\SD`.
 4. **ESPFileUpdater** : version corrigée dans `lib\ESPFileUpdater\` (pas dans `lib_deps`), voir doc de reprise n°7.
 5. Nouvelle carte : `uploadfs` **d'abord**, puis `upload`. `uploadfs` n'est utile que si `data\www` change ; **ne pas le lancer pour appliquer un patch de code** (`-t upload` suffit).
@@ -166,7 +164,6 @@ Haut-parleur 4 à 8 Ω. **Grésillements** constatés au début : causés par de
 - [ ] Brancher une LiPo et étalonner la batterie ; tester la luminosité (PWM GPIO 16).
 - [x] Tiny + ILI9488 : son, SD + diaporama, luminosité, réveil, arrêt programmé et `uploadfs` validés (12 nov. 2026).
 - [ ] Tiny + ILI9488 : brancher une LiPo et étalonner la batterie (GPIO 9).
-- [ ] Tester la S3-Zero OLED (`-e ehradio_s3_zero`, `uploadfs` puis `upload` — ou page de secours si `uploadfs` échoue) et les 2 cartes douteuses.
 - [ ] Envoyer l'issue à trip5 (`ISSUE_trip5_ESPFileUpdater.md`).
 - [ ] Sculpture de circuit en laiton (Ø 1 mm commandé) : idée de forme encore en réflexion ; objectif 1 ou 2 cadeaux pour Noël ; s'entraîner à souder le laiton (tiges, anneau, figure plate, puis 3D).
 - [ ] Choisir les stations préférées ; exporter playlist + Wi-Fi dans le dépôt.

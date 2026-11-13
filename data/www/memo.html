@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pense-bête</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background: #14161a; color: #e8eaed; margin: 0; padding: 16px; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 12px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 8px; color: #9aa0a6; font-weight: 600; }
+  .card { background: #1f2329; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  label { display: flex; align-items: center; gap: 6px; }
+  input[type=text], input[type=date], input[type=time], textarea {
+    background: #14161a; color: inherit; border: 1px solid #3c4043; border-radius: 6px; padding: 8px; font: inherit; }
+  input[type=text] { flex: 1 1 200px; min-width: 0; }
+  textarea { width: 100%; box-sizing: border-box; height: 120px; font-family: ui-monospace, monospace; font-size: .8rem; }
+  button { background: #2d6cdf; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button.sec { background: #3c4043; }
+  button.del { background: transparent; color: #f28b82; padding: 4px 8px; font-size: 1.1rem; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #2b2f36; }
+  li:last-child { border-bottom: 0; }
+  .date { min-width: 118px; font-variant-numeric: tabular-nums; }
+  .txt { flex: 1; word-break: break-word; }
+  .past { opacity: .45; }
+  .tag { font-size: .75rem; color: #81c995; }
+  #preview { font-family: ui-monospace, monospace; font-size: .85rem; color: #fdd663; min-height: 1.2em; word-break: break-word; }
+  #msg { min-height: 1.2em; font-size: .9rem; color: #81c995; }
+  #msg.err { color: #f28b82; }
+  .hint { font-size: .8rem; color: #9aa0a6; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📝 Pense-bête</h1>
+
+  <div class="card">
+    <label><input type="checkbox" id="show"> Afficher les 3 prochains événements sur la radio, à la place de la météo</label>
+    <h2>Affichage actuel</h2>
+    <div id="preview">…</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Nouvel événement</h2>
+    <div class="row">
+      <input type="date" id="d">
+      <input type="time" id="t" title="Heure (facultative)">
+      <label><input type="checkbox" id="a"> chaque année</label>
+    </div>
+    <div class="row">
+      <input type="text" id="x" placeholder="Texte court (ex. Dentiste, Anniversaire Paul)" maxlength="55">
+      <button id="add">Ajouter</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Événements <span id="count" class="hint"></span></h2>
+    <ul id="list"></ul>
+    <div class="row"><button class="sec" id="clean">Supprimer les événements passés</button></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Sauvegarde</h2>
+    <div class="hint">La liste est stockée dans la mémoire flash de la radio : un <b>uploadfs l'efface</b>. Copie ce texte dans un fichier avant, et colle-le ici pour restaurer.</div>
+    <textarea id="csv" spellcheck="false"></textarea>
+    <div class="row"><button class="sec" id="export">Mettre à jour le texte</button><button id="import">Restaurer depuis ce texte</button></div>
+    <div class="hint">Format : <code>AAAA-MM-JJ;HH:MM;annuel(1/0);texte</code> (heure facultative).</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Sauvegarde de toute la radio sur la carte SD</h2>
+    <div class="hint">Copie <b>tous</b> les fichiers de la mémoire flash (pages web, playlist, Wi-Fi, pense-bête…) dans le dossier <code>/backup</code> de la SD, ou les remet en place. Après une restauration, la radio redémarre. Attention : le fichier Wi-Fi est copié en clair sur la SD.</div>
+    <div class="row">
+      <button id="sdb">Exporter vers la SD</button>
+      <button class="sec" id="sdr">Restaurer depuis la SD</button>
+    </div>
+    <div id="sdmsg" class="hint"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = [], textMax = 55, max = 60, csvEdited = false;
+
+function say(t, err) { const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
+function csvOf(list) { return list.map(i => `${i.d};${i.t};${i.a};${i.x}`).join('\n') + '\n'; }
+
+async function post(params) {
+  const r = await fetch('/memo', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
+  if (!r.ok) throw new Error(await r.text() || r.status);
+  return r.json();
+}
+function apply(st) {
+  items = st.items; textMax = st.textmax; max = st.max;
+  $('show').checked = !!st.show;
+  $('preview').textContent = st.preview || '(rien de prévu)';
+  $('x').maxLength = textMax;
+  render();
+}
+async function load() {
+  try { apply(await (await fetch('/memo')).json()); say(''); }
+  catch (e) { say('Radio injoignable : ' + e.message, true); }
+}
+async function save(list, okMsg) {
+  try { apply(await post({ csv: csvOf(list) })); say(okMsg || 'Enregistré.'); }
+  catch (e) { say('Échec : ' + e.message, true); }
+}
+function todayStr() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); }
+function frDate(d) { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}`; }
+
+function render() {
+  const ul = $('list'); ul.innerHTML = '';
+  const today = todayStr();
+  items.forEach((it, idx) => {
+    const li = document.createElement('li');
+    const past = !it.a && it.d < today;
+    if (past) li.className = 'past';
+    const d = document.createElement('div'); d.className = 'date';
+    d.textContent = frDate(it.d) + (it.t ? ' ' + it.t : '');
+    const x = document.createElement('div'); x.className = 'txt'; x.textContent = it.x;
+    li.append(d, x);
+    if (it.a) { const g = document.createElement('span'); g.className = 'tag'; g.textContent = '↻ annuel'; li.append(g); }
+    if (past) { const g = document.createElement('span'); g.className = 'tag'; g.textContent = 'passé'; li.append(g); }
+    const b = document.createElement('button'); b.className = 'del'; b.title = 'Supprimer'; b.textContent = '✕';
+    b.onclick = () => save(items.filter((_, k) => k !== idx), 'Supprimé.');
+    li.append(b);
+    ul.append(li);
+  });
+  $('count').textContent = `(${items.length}/${max})`;
+  if (!csvEdited && document.activeElement !== $('csv')) $('csv').value = csvOf(items);   // ne pas ecraser un texte colle pour restauration
+}
+
+$('csv').addEventListener('input', () => { csvEdited = true; });
+$('add').onclick = () => {
+  const d = $('d').value, t = $('t').value, x = $('x').value.replace(/;/g, ',').trim();
+  if (!d) return say('Choisis une date.', true);
+  if (!x) return say('Écris un texte.', true);
+  if (items.length >= max) return say('Liste pleine (' + max + ').', true);
+  save([...items, { d, t, a: $('a').checked ? 1 : 0, x }], 'Ajouté.');
+  $('x').value = ''; $('t').value = ''; $('a').checked = false;
+};
+$('x').addEventListener('keydown', e => { if (e.key === 'Enter') $('add').click(); });
+$('clean').onclick = () => { const t = todayStr(); save(items.filter(i => i.a || i.d >= t), 'Événements passés supprimés.'); };
+$('show').onchange = async () => {
+  try { apply(await post({ show: $('show').checked ? '1' : '0' })); say($('show').checked ? 'Affiché sur la radio.' : 'Météo rétablie.'); }
+  catch (e) { say('Échec : ' + e.message, true); }
+};
+$('export').onclick = () => { csvEdited = false; $('csv').value = csvOf(items); };
+$('import').onclick = async () => {
+  if (!confirm('Remplacer toute la liste par ce texte ?')) return;
+  try { csvEdited = false; apply(await post({ csv: $('csv').value })); say('Liste restaurée.'); }
+  catch (e) { say('Échec : ' + e.message, true); }
+};
+async function sdStatus() {
+  try {
+    const st = await (await fetch('/sdbackup')).json();
+    $('sdmsg').textContent = st.msg || '';
+    $('sdmsg').style.color = st.busy ? '#fdd663' : (st.ok ? '#81c995' : '#f28b82');
+    $('sdb').disabled = $('sdr').disabled = !!st.busy;
+    if (st.busy) setTimeout(sdStatus, 1000);
+    else if (st.msg && st.msg.startsWith('Restauration') && st.ok) setTimeout(() => location.reload(), 12000);
+  } catch (e) { setTimeout(sdStatus, 3000); }   // la radio redemarre : on reessaie
+}
+async function sdAction(action) {
+  await fetch('/sdbackup', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action }) });
+  sdStatus();
+}
+$('sdb').onclick = () => { if (confirm('Copier tous les fichiers de la radio vers la SD (/backup) ?')) sdAction('backup'); };
+$('sdr').onclick = () => { if (confirm('Remplacer les fichiers de la radio par ceux de la SD (/backup), puis redémarrer ?')) sdAction('restore'); };
+$('d').value = todayStr();
+load();
+setInterval(load, 60000);   // l'aperçu suit la date et l'heure
+</script>
+</body>
+</html>

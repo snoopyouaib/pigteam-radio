@@ -12,6 +12,7 @@
 #include "mqtt.h"
 #include "netserver.h"
 #include "network.h"
+#include "memo.h"
 #include "player.h"
 #include "rtcsupport.h"
 #include "startup.h"
@@ -64,6 +65,12 @@ void ticks() {
     if (timeSyncTicks >= timeSyncInterval) {
       timeSyncTicks=0;
       network.forceTimeSync = true;
+    }
+    // Pense-bete : le texte change quand la date ou l'heure d'un evenement passe (controle toutes les 30 s)
+    static uint8_t memoTicks = 0;
+    if (config.store.showmemo && ++memoTicks >= 30) {
+      memoTicks = 0;
+      if (memo.changed()) network.buildWeatherString();
     }
     // Weather sync interval: config value is in minutes, convert to seconds
     uint16_t weatherSyncInterval = (uint16_t)config.store.weathersyncinterval * 60;
@@ -613,7 +620,7 @@ void doSync(void * pvParameters) {
       }
     }
   }
-  if (network.weatherBuf && config.store.showweather && network.forceWeather) {
+  if (network.weatherBuf && config.store.showweather && !config.store.showmemo && network.forceWeather) {
     // Fetch weather without interrupting display (keep showing cached data)
     network.forceWeather = false;
     if (!getWeather(network.weatherBuf) && shouldClearWeatherCacheOnFailure()) {
@@ -707,6 +714,12 @@ static bool shouldClearWeatherCacheOnFailure() {
 bool MyNetwork::buildWeatherString() {
   #if (DSP_MODEL!=DSP_DUMMY)
     if (!weatherBuf) return false;
+
+    if (config.store.showmemo) {            // pense-bete a la place de la meteo
+      memo.buildText(weatherBuf, WEATHER_STRING_L);
+      display.putRequest(NEWWEATHER);
+      return true;
+    }
 
     // If no cached data or cache expired, show loading message
     if (!WeatherCache::valid) {

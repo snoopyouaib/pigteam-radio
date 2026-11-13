@@ -145,6 +145,7 @@ struct config_t // specify defaults here (and macros in options.h) (defaults are
 
   // Weather
   bool      showweather = false;
+  bool      showmemo = false;          // PigTeam : pense-bete affiche a la place de la meteo
   uint8_t   weathersyncinterval = WEATHER_SYNC_INTERVAL;
   char      weatherapi[6] = WEATHER_API;
   char      weatherlang[6] = WEATHER_LANG_OWM;

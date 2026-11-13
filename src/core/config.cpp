@@ -831,6 +831,7 @@ const configKeyMap Config::keyMap[] = {
   CONFIG_KEY_ENTRY(timesyncinterval, "timesync"),
   // Weather
   CONFIG_KEY_ENTRY(showweather, "showweather"),
+  CONFIG_KEY_ENTRY(showmemo, "showmemo"),
   CONFIG_KEY_ENTRY(weathersyncinterval, "weathersync"),
   CONFIG_KEY_ENTRY(weatherapi, "weatherapi"),
   CONFIG_KEY_ENTRY(weatherlang, "weatherlang"),
