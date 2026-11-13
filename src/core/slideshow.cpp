@@ -71,9 +71,19 @@ void Slideshow::touchEnd() {
 
 slideshowEvent_e Slideshow::poll() {
   if (_wantOn && !_on) {
-    _on = true;
+    // Verrou : on verifie la carte SD et la liste des photos AVANT de toucher a l'ecran.
+    // Sans carte (ou sans photo), le diaporama ne demarre pas et la radio reste affichee.
     _files.clear();
     _order.clear();
+    if (!_scan()) {
+      if (_mountedByUs) {              // on avait monte la SD pour rien : on remet comme avant
+        if (config.getMode() == PM_WEB) sdman.stop();
+        _mountedByUs = false;
+      }
+      _wantOn = false;
+      return SSE_NONE;
+    }
+    _on = true;
     _last = -1;
     _idx = 0;
     _failures = 0;
