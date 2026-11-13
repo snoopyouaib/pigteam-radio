@@ -262,10 +262,11 @@
   #define DSP_TASK_STACK_SIZE   12      /* KB : le decodage JPEG + lecture SD demandent plus de pile (defaut 8) */
 
   /* Decodeur : DAC I2S PCM5102 (VS1053 desactive) */
-  /* I2S cote droit de la carte (loin du SPI ecran, cote gauche) : 42, 41, 40 se suivent */
-  #define I2S_DOUT      42   /* PCM5102 DIN */
-  #define I2S_BCLK      41   /* PCM5102 BCK */
-  #define I2S_LRC       40   /* PCM5102 LCK (LRCK / WS) */
+  /* I2S : GPIO 15, 16, 17 (cote gauche, ils se suivent, a l'ecart de SCK 12 / MOSI 11 du bus SPI ecran).
+     Cables rigides courts et soudes ; condensateur 10 a 100 uF entre VIN et GND, au plus pres du module son. */
+  #define I2S_DOUT      15   /* PCM5102 DIN */
+  #define I2S_BCLK      16   /* PCM5102 BCK */
+  #define I2S_LRC       17   /* PCM5102 LCK (LRCK / WS) */
   #define VS1053_CS     255  /* 255 = VS1053 non utilise */
 #endif
 
