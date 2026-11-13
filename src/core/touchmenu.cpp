@@ -7,6 +7,8 @@
 #include "utility.h"
 #include "slideshow.h"
 #include "netserver.h"
+#include "network.h"
+#include "display.h"
 #include "backlightcontrols.h"
 #include "../displays/dspcore.h"
 
@@ -16,6 +18,8 @@ TouchMenu touchmenu;
 enum { TL_SLIDE, TL_SCREEN, TL_MODE, TL_ALARM, TL_SLEEP, TL_STATIONS, TL_FREE, TL_CLOSE, TL_COUNT };
 /* sous-menu diaporama : 2 colonnes x 2 lignes (SB_TIME = duree par photo, chaque toucher passe a la suivante) */
 enum { SB_ON, SB_TIME, SB_RANDOM, SB_NORMAL, SB_COUNT };
+/* sous-menu source : 2 colonnes x 2 lignes (Radio / SD normal / SD aleatoire / Retour) */
+enum { SRC_RADIO, SRC_SD, SRC_SDRND, SRC_BACK, SRC_COUNT };
 static const uint16_t SLIDE_TIMES[] = { 5, 8, 15, 30, 60 };   // secondes par photo
 #define SLIDE_TIMES_N (sizeof(SLIDE_TIMES) / sizeof(SLIDE_TIMES[0]))
 /* liste des stations : 6 par page (2 colonnes x 3 lignes) + ligne de navigation  < Retour > */
@@ -100,7 +104,7 @@ void TouchMenu::step() {
 
 int TouchMenu::_hit(int x, int y) {
   const int W = dsp.width(), H = dsp.height();
-  const int count = (_page == 0) ? (int)TL_COUNT : (_page == 1) ? (int)SB_COUNT : (int)ST_COUNT;
+  const int count = (_page == 0) ? (int)TL_COUNT : (_page == 1) ? (int)SB_COUNT : (_page == 3) ? (int)SRC_COUNT : (int)ST_COUNT;
   for (int i = 0; i < count; i++) {
     int tx, ty, tw, th;
     tileRect(_page, i, W, H, tx, ty, tw, th);
@@ -151,6 +155,16 @@ void TouchMenu::touchEnd() {
     }
     return;
   }
+  if (_page == 3) {                  // sous-menu source : Radio / SD normal / SD aleatoire
+    switch (hit) {
+      case SRC_RADIO: if (network.status != SDOFFLINE) { _arg = 0; _pending = TL_MODE; _wantOn = false; } break;   // lance apres fermeture du menu
+      case SRC_SD:    _arg = 1; _pending = TL_MODE; _wantOn = false; break;
+      case SRC_SDRND: _arg = 2; _pending = TL_MODE; _wantOn = false; break;
+      case SRC_BACK:  _page = 0; _dirty = true; break;
+      default: break;
+    }
+    return;
+  }
   if (_page == 1) {                  // sous-menu diaporama
     switch (hit) {
       #ifdef SLIDESHOW_ENABLE
@@ -180,7 +194,7 @@ void TouchMenu::touchEnd() {
       }
       break;
     case TL_SCREEN: _pending = TL_SCREEN; _wantOn = false; break;
-    case TL_MODE:   _pending = TL_MODE;   _wantOn = false; break;
+    case TL_MODE:   _page = 3; _dirty = true; break;   // sous-menu source (Radio / SD / SD aleatoire)
     case TL_CLOSE:  _wantOn = false; break;
     #ifdef ALARM_ENABLE
     case TL_ALARM:
@@ -214,7 +228,19 @@ void TouchMenu::runPending() {
     #endif
     case TL_SCREEN: config.setDspOn(false); backlightControls.restart(); break;
     case TL_STATIONS: player.sendCommand({PR_PLAY, (uint32_t)_arg}); break;
-    case TL_MODE:   controls.onBtnClick(EVT_BTN_MODE); break;
+    case TL_MODE: {                                    // _arg : 0 = radio, 1 = SD normal, 2 = SD aleatoire
+      const bool web = (config.getMode() == PM_WEB);
+      if (_arg == 0) {
+        if (!web) controls.onBtnClick(EVT_BTN_MODE);   // SD -> radio
+      } else {
+        config.saveValue(&config.store.sdshuffle, (bool)(_arg == 2));
+        netserver.requestOnChange(SDSHUFFLE, 0);
+        display.putRequest(DSPRSSI, 0);
+        if (web) controls.onBtnClick(EVT_BTN_MODE);    // radio -> SD (l'ordre choisi est deja enregistre)
+        else if (_arg == 2) player.next();             // deja en SD : tire tout de suite une autre piste
+      }
+      break;
+    }
     default: break;
   }
 }
@@ -240,7 +266,10 @@ void TouchMenu::_drawTile(int i, int W, int H) {
         #endif
         break;
       case TL_SCREEN: l1 = "Ecran"; l2 = "eteindre"; break;
-      case TL_MODE:   l1 = (config.getMode() == PM_WEB) ? "SD" : "Radio"; l2 = "changer"; break;
+      case TL_MODE:
+        l1 = "Source";
+        l2 = (config.getMode() == PM_WEB) ? "Radio" : config.store.sdshuffle ? "SD melange" : "SD normal";
+        break;
       case TL_ALARM:
         l1 = "Reveil";
         #ifdef ALARM_ENABLE
@@ -279,6 +308,14 @@ void TouchMenu::_drawTile(int i, int W, int H) {
       case SB_NORMAL: l1 = "Normal";    l2 = "alphabetique";  if (!rnd) edge = TM_ON; break;
       default: break;
     }
+  } else if (pg == 3) {                      // sous-menu source
+    const bool web = (config.getMode() == PM_WEB);
+    switch (i) {
+      case SRC_RADIO: l1 = "Radio"; l2 = "web"; en = (network.status != SDOFFLINE); if (web) edge = TM_ON; break;
+      case SRC_SD:    l1 = "SD";    l2 = "normal"; if (!web && !config.store.sdshuffle) edge = TM_ON; break;
+      case SRC_SDRND: l1 = "SD";    l2 = "aleatoire"; if (!web && config.store.sdshuffle) edge = TM_ON; break;
+      default:        l1 = "Retour"; break;
+    }
   } else {                                   // liste des stations
     const uint16_t total = utility.playlistLength();
     const uint16_t pages = (total + ST_PER_PAGE - 1) / ST_PER_PAGE;
@@ -307,7 +344,7 @@ void TouchMenu::_drawTile(int i, int W, int H) {
   }
   dsp.fillRoundRect(x, y, w, h, 10, TM_TILE);
   dsp.drawRoundRect(x, y, w, h, 10, en ? edge : TM_OFF);
-  if (en && edge == TM_ON && ((pg == 1 && (i == SB_RANDOM || i == SB_NORMAL)) || (pg == 2 && i < ST_PER_PAGE)))
+  if (en && edge == TM_ON && ((pg == 1 && (i == SB_RANDOM || i == SB_NORMAL)) || (pg == 2 && i < ST_PER_PAGE) || (pg == 3 && i < SRC_BACK)))
     dsp.drawRoundRect(x + 1, y + 1, w - 2, h - 2, 9, TM_ON);   // choix / station actifs : trait epais
   dsp.setFont();
   dsp.setTextWrap(false);
@@ -333,7 +370,7 @@ void TouchMenu::_draw() {
   _drawPage = _page;
   const int W = dsp.width(), H = dsp.height();
   dsp.fillScreen(TM_BG);
-  const int count = (_drawPage == 0) ? (int)TL_COUNT : (_drawPage == 1) ? (int)SB_COUNT : (int)ST_COUNT;
+  const int count = (_drawPage == 0) ? (int)TL_COUNT : (_drawPage == 1) ? (int)SB_COUNT : (_drawPage == 3) ? (int)SRC_COUNT : (int)ST_COUNT;
   for (int i = 0; i < count; i++) _drawTile(i, W, H);
   _busy = false;
 }

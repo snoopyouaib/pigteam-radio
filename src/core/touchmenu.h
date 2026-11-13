@@ -46,7 +46,7 @@ class TouchMenu {
     volatile uint16_t _x = 0, _y = 0;
     uint32_t _t0 = 0;
     volatile uint32_t _lastAct = 0;
-    volatile uint8_t _page = 0;               // 0 = menu principal, 1 = sous-menu diaporama, 2 = liste des stations
+    volatile uint8_t _page = 0;               // 0 = menu principal, 1 = sous-menu diaporama, 2 = liste des stations, 3 = sous-menu source (radio / SD)
     volatile uint16_t _stPage = 0;            // page courante de la liste des stations (0 = premiere)
     volatile uint16_t _slideSecs = 5;         // duree par photo choisie dans le sous-menu diaporama (secondes)
     volatile uint16_t _arg = 0;               // argument de l'action differee (numero de station)
