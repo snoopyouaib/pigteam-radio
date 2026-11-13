@@ -104,6 +104,7 @@ void Slideshow::_fail(const char* msg) {
 }
 
 bool Slideshow::_scan() {
+  const uint32_t t0 = millis();
   if (!sdman.ready) {                  // en mode radio web la SD n'est pas montee : on la monte pour le diaporama
     if (!sdman.start()) { sdman.stop(); _fail("Diaporama : carte SD absente"); return false; }
     _mountedByUs = true;
@@ -114,26 +115,23 @@ bool Slideshow::_scan() {
     _fail("Diaporama : dossier " SLIDESHOW_DIR " introuvable");
     return false;
   }
+  // getNextFileName() lit seulement le nom dans le repertoire : on n'ouvre plus chaque fichier (long avec des centaines de photos)
   while (true) {
-    File f = dir.openNextFile();
-    if (!f) break;
-    bool isDir = f.isDirectory();
-    String n = f.name();
-    f.close();
-    if (isDir) continue;
+    String n = dir.getNextFileName();
+    if (n.length() == 0) break;
     int slash = n.lastIndexOf('/');
     if (slash >= 0) n = n.substring(slash + 1);
     if (n.length() == 0 || n[0] == '.') continue;   // fichiers caches (ex. ._IMG.jpg de macOS)
     String l = n;
     l.toLowerCase();
-    if (!(l.endsWith(".jpg") || l.endsWith(".jpeg"))) continue;
+    if (!(l.endsWith(".jpg") || l.endsWith(".jpeg"))) continue;   // sous-dossiers et autres fichiers ignores
     _files.push_back(String(SLIDESHOW_DIR) + "/" + n);
     if (_files.size() >= SLIDESHOW_MAX_FILES) break;
   }
   dir.close();
   if (_files.empty()) { _fail("Diaporama : aucune photo dans " SLIDESHOW_DIR); return false; }
   std::sort(_files.begin(), _files.end(), [](const String& a, const String& b) { return a.compareTo(b) < 0; });
-  FUNCTIONLOG("Slideshow", "%u photo(s) dans %s", (unsigned)_files.size(), SLIDESHOW_DIR);
+  FUNCTIONLOG("Slideshow", "%u photo(s) dans %s (liste lue en %lu ms)", (unsigned)_files.size(), SLIDESHOW_DIR, (unsigned long)(millis() - t0));
   return true;
 }
 
