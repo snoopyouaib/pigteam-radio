@@ -36,15 +36,24 @@ enum import_e      : uint8_t  { IMDONE=0, IMWIFI=2 };
 const char emptyfs_html[] PROGMEM = R"(
 <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.25"><meta charset="UTF-8">
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAABJ0AAASdAHeZh94AAAAlElEQVRYw+2XSw6AIAxEG9fe/0zeSuOCBI2FVqafKCTdFeYFBmiJBse2LjtFjn8DnOIlwgHcIe7iLgC1SA/ABKgW4gBMd+RJlAuTq2QKIJmIBLjkaRYYFWdzW6ZCAHTzpItqAMSgmrNFxmuDTQC4+ARI4QFvCMh7Dxf3gDD5+9NvecobEAqT34DN8klQS7r1Cp9oTA8ah+h47LQOmQAAAABJRU5ErkJggg==">
-<title>ehRadio - WEB Board Uploader</title><style>html, body{margin: 0; padding: 0; height: 100%; background-color:#000; color:#eecccc; font-size:20px; display:flex; flex-direction:column;}
-hr{margin:20px 0;border:0; border-top:#555 1px solid;} p{text-align:center; margin-bottom:10px;} section{max-width:500px; text-align:center; margin:0 auto 30px auto; padding:20px; flex:1;}
-.hidden{display:none;} a{color: #ccccee; font-size:14px; text-decoration: none; font-weight: bold;} a:hover{text-decoration: underline}
-#copy{text-align: center; padding: 14px; font-size: 14px;}
-input[type=file]{color:#ccc;} input[type=file]::file-selector-button, input[type=submit]{border:2px solid #eecccc;color:#000;padding:6px 16px; border-radius:25px; background-color:#eecccc;margin:0 6px; cursor:pointer;} input[type=file]:hover::file-selector-button, input[type=submit]:hover{background-color:#ccccee;border-color:#ccccee}
-input[type=submit]{font-size:18px; padding:8px 26px; margin-top:10px; font-family:Times;} span{color:#ccc} .flex{display:flex; justify-content: space-around;margin-top:10px;}
-input[type=text],input[type=password]{width:170px; background:#272727; color:#eecccc; padding:6px 12px; font-size:20px; border:#2d2d2d 1px solid; margin:4px 0 0 4px; border-radius:4px; outline:none;}
-select{background:#272727; color:#eecccc; padding:4px 8px; font-size:16px; border:#2d2d2d 1px solid; border-radius:4px; margin-left:8px;}
-@media screen and (max-width:480px) {section{zoom:0.7; -moz-transform:scale(0.7);}}
+<title>ehRadio - WEB Board Uploader</title><style>
+:root{color-scheme:dark;}
+html,body{margin:0;padding:0;min-height:100%;background:#14161a;color:#e8eaed;font:16px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;}
+hr{margin:16px 0;border:0;border-top:#2b2f36 1px solid;}
+p{text-align:center;margin:10px 0;}
+h2{font-size:1.25rem;margin:0;}
+section{width:100%;max-width:520px;box-sizing:border-box;text-align:center;margin:16px auto;padding:18px;flex:1;background:#1f2329;border-radius:14px;}
+.hidden{display:none;}
+a{color:#8ab4f8;font-size:14px;text-decoration:none;font-weight:600;}
+a:hover{text-decoration:underline;}
+#copy{text-align:center;padding:14px;font-size:13px;color:#9aa0a6;}
+span{color:#9aa0a6;}
+.flex{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-around;margin-top:10px;}
+input[type=file]{color:#9aa0a6;max-width:100%;}
+input[type=file]::file-selector-button,input[type=submit]{border:0;color:#fff;padding:8px 18px;border-radius:18px;background:#2d6cdf;margin:0 8px 0 0;cursor:pointer;font:inherit;}
+input[type=submit]{font-size:16px;padding:10px 26px;margin-top:10px;}
+input[type=text],input[type=password]{width:170px;max-width:100%;box-sizing:border-box;background:#14161a;color:#e8eaed;padding:8px 12px;font-size:16px;border:#3c4043 1px solid;margin:4px 0 0 4px;border-radius:8px;outline:none;}
+select{background:#14161a;color:#e8eaed;padding:8px 10px;font-size:16px;border:#3c4043 1px solid;border-radius:8px;margin-left:8px;max-width:100%;}
 </style>
 <script type="text/javascript" src="/variables.js"></script>
 <script type="text/javascript" src="/locale.js"></script>
