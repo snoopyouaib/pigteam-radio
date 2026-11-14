@@ -101,6 +101,7 @@
   "lbl_temp_unit": "Temperature Unit",
   "lbl_time_interval": "Time Sync Interval (hours)",
   "lbl_timeout_min": "Timeout (min)",
+  "lbl_ss_move": "Move (sec)",
   "lbl_timeout_sec": "Timeout (sec)",
   "lbl_unnamed": "Unnamed",
   "lbl_url": "URL",

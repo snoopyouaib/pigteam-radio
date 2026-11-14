@@ -414,6 +414,7 @@ void Config::defaultSettings(const char *val, uint8_t clientId) {
     saveValue(&store.screensaverPlayingBlank, (bool)SS_PLAYING_BLANK);
     saveValue(&store.screensaverPlayingTimeout, (uint16_t)SS_PLAYING_TIME);
     saveValue(&store.screensaverFullDateTime, (bool)SS_FULL_DATETIME);
+    saveValue(&store.screensaverMove, (uint16_t)SCREENSAVERMOVE);
     saveValue(&store.dimmingEnabled, (bool)DIMMING_ENABLED);
     saveValue(&store.dimmingTimeout, (uint16_t)DIMMING_TIMEOUT);
     saveValue(&store.dimmingBrightness, (uint8_t)DIMMING_BRIGHTNESS);
@@ -818,6 +819,7 @@ const configKeyMap Config::keyMap[] = {
   CONFIG_KEY_ENTRY(screensaverPlayingBlank, "scrnsvrplbl"),
   CONFIG_KEY_ENTRY(screensaverPlayingTimeout, "scrnsvrplto"),
   CONFIG_KEY_ENTRY(screensaverFullDateTime, "scrnsvrfull"),
+  CONFIG_KEY_ENTRY(screensaverMove, "scrnsvrmv"),
   CONFIG_KEY_ENTRY(dimmingEnabled, "dimmingen"),
   CONFIG_KEY_ENTRY(dimmingTimeout, "dimmingto"),
   CONFIG_KEY_ENTRY(dimmingBrightness, "dimmingbr"),

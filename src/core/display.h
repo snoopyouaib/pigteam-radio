@@ -64,7 +64,7 @@ class Display {
     void lock()   { _locked=true; }
     void unlock() { _locked=false; }
   private:
-    ScrollWidget *_meta = nullptr, *_title1 = nullptr, *_plcurrent = nullptr, *_weather = nullptr, *_title2 = nullptr;
+    ScrollWidget *_meta = nullptr, *_title1 = nullptr, *_plcurrent = nullptr, *_weather = nullptr, *_title2 = nullptr, *_ssmemo = nullptr;
     PlayListWidget *_plwidget = nullptr;
     #ifdef UPDATEURL
       ScrollWidget *_updLabel = nullptr;
@@ -90,6 +90,12 @@ class Display {
     void _reinitWidgets();
     void _setLayoutPointers();
     void _applyState();
+    ScrollConfig _ssMemoConf();
+    bool    _ssMemoOn();
+    int32_t _ssMemoBand();
+    void    _ssMemoUpdate(bool next = false);
+    uint8_t _ssIdx = 0;
+    uint32_t _ssLastMove = 0;
     void _slideshowBegin();
     void _slideshowEnd();
     void _menuBegin();

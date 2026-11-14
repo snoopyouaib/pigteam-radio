@@ -130,6 +130,7 @@ struct config_t // specify defaults here (and macros in options.h) (defaults are
   bool      screensaverPlayingBlank = SS_PLAYING_BLANK;
   uint16_t  screensaverPlayingTimeout = SS_PLAYING_TIME;
   bool      screensaverFullDateTime = SS_FULL_DATETIME;
+  uint16_t  screensaverMove = SCREENSAVERMOVE;   // PigTeam : delai (s) entre deux deplacements de l'horloge / changements de memo
   bool      dimmingEnabled = DIMMING_ENABLED;
   uint16_t  dimmingTimeout = DIMMING_TIMEOUT;
   uint8_t   dimmingBrightness = DIMMING_BRIGHTNESS;

@@ -631,7 +631,7 @@ void NetServer::processQueue() {
                                   config.store.irtlp,
                                   VOLUME_SCALE);
                                   break;
-      case GETSCREEN:     snprintf(wsbuf, sizeof(wsbuf), "{\"flip\":%d,\"inv\":%d,\"nump\":%d,\"dspon\":%d,\"br\":%d,\"con\":%d,\"scre\":%d,\"scrb\":%d,\"scrt\":%d,\"scrpe\":%d,\"scrpb\":%d,\"scrpt\":%d,\"scrfull\":%d,\"bufbar\":%d,\"vu\":%d,\"dim\":%d,\"dimto\":%d,\"dimbr\":%d,\"volpg\":%d,\"clock12\":%d,\"invtitle\":%d,\"layoutId\":%d,\"themeId\":%d}",
+      case GETSCREEN:     snprintf(wsbuf, sizeof(wsbuf), "{\"flip\":%d,\"inv\":%d,\"nump\":%d,\"dspon\":%d,\"br\":%d,\"con\":%d,\"scre\":%d,\"scrb\":%d,\"scrt\":%d,\"scrpe\":%d,\"scrpb\":%d,\"scrpt\":%d,\"scrfull\":%d,\"scrmv\":%d,\"bufbar\":%d,\"vu\":%d,\"dim\":%d,\"dimto\":%d,\"dimbr\":%d,\"volpg\":%d,\"clock12\":%d,\"invtitle\":%d,\"layoutId\":%d,\"themeId\":%d}",
                                   config.store.flipscreen,
                                   config.store.invertdisplay,
                                   config.store.numplaylist,
@@ -645,6 +645,7 @@ void NetServer::processQueue() {
                                   config.store.screensaverPlayingBlank,
                                   config.store.screensaverPlayingTimeout,
                                   config.store.screensaverFullDateTime,
+                                  config.store.screensaverMove,
                                   config.store.bufferbar,
                                   config.store.vumeter,
                                   config.store.dimmingEnabled,

@@ -157,10 +157,14 @@
               <input type="number" id="scrpt" data-command="screensaverplayingtimeout" value="" maxlength="3" min="1" max="1080" />
             </div>
           </div>
-          <div class="flex-row group group_full_time hidden">
-            <div class="inputwrap center">
+          <div class="flex-row">
+            <div class="inputwrap center group group_full_time hidden">
               <span class="inputtitle" data-i18n="lbl_full_time_screensaver">Full Time</span>
               <div class="checkbox ssoption" id="scrfull" data-command="screensaverfull"><div class="knob"></div></div>
+            </div>
+            <div class="inputwrap center group group_tft hidden">
+              <span class="inputtitle" data-i18n="lbl_ss_move">Move (sec)</span>
+              <input type="number" id="scrmv" data-command="screensavermove" value="" maxlength="3" min="5" max="600" />
             </div>
           </div>
           <div class="row-title group group_dimming hidden"><span data-i18n="ttl_auto_dimming">Auto Dimming</span></div>

@@ -101,6 +101,7 @@
   "lbl_temp_unit": "Unité de température",
   "lbl_time_interval": "Intervalle de synchronisation temporelle (heures)",
   "lbl_timeout_min": "Délai d'attente (min)",
+  "lbl_ss_move": "Déplacement (sec)",
   "lbl_timeout_sec": "Délai d'attente (sec)",
   "lbl_unnamed": "Sans nom",
   "lbl_url": "URL",

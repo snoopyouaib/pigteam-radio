@@ -237,6 +237,8 @@ void Display::_buildPager() {
   }
   if (weatherConf_ptr->buffsize > 0) {
     _weather = new ScrollWidget("~", *weatherConf_ptr, config.theme.weather, config.theme.background);
+    _ssmemo  = new ScrollWidget("~", _ssMemoConf(), config.theme.weather, config.theme.background);  // PigTeam : pense-bete sur l'ecran de veille
+    pages[PG_SCREENSAVER]->addWidget(_ssmemo);
   }
 
   if (_volbar)   _footer->addWidget(_volbar);
@@ -507,6 +509,8 @@ void Display::_swichMode(displayMode_e newmode) {
   if (newmode == SCREENSAVER || newmode == SCREENBLANK) {
     config.isScreensaver = true;
     _pager->setPage(pages[PG_SCREENSAVER], true);
+    _ssLastMove = millis();
+    if (newmode == SCREENSAVER) _ssMemoUpdate(); else if (_ssmemo) _ssmemo->setText("");
     if (newmode == SCREENBLANK) {
       //dsp.clearClock();
       _clock->clear();
@@ -734,6 +738,7 @@ void Display::loop() {
           break;
         }
         case NEWWEATHER: {
+          _ssMemoUpdate();
           #if IP_WEATHER_SHARED // skip weather repaint during VOL to avoid overwriting the IP shown there
             if (_mode != VOL && _weather && network.weatherBuf) _weather->setText(network.weatherBuf);
           #else
@@ -909,6 +914,36 @@ void Display::_title() {
   backlightControls.restart();
 }
 
+/* Pense-bete sur l'ecran de veille : une ligne defilante en bas, l'horloge se deplace au-dessus */
+ScrollConfig Display::_ssMemoConf() {
+  ScrollConfig c = *weatherConf_ptr;
+  c.widget.top = dsp.height() - TFT_FRAMEWDT - c.widget.textsize * CHARHEIGHT;
+  return c;
+}
+
+bool Display::_ssMemoOn() {
+  return _ssmemo && config.store.showmemo && network.weatherBuf && network.weatherBuf[0];
+}
+
+int32_t Display::_ssMemoBand() {
+  return _ssMemoOn() ? (int32_t)(weatherConf_ptr->widget.textsize * CHARHEIGHT + 6) : 0;
+}
+
+/* un seul evenement a la fois (parmi les 3 du texte " ~ "), on passe au suivant a chaque deplacement de l'horloge */
+void Display::_ssMemoUpdate(bool next) {
+  if (!_ssmemo) return;
+  if (!_ssMemoOn()) { _ssmemo->setText(""); return; }
+  const String all(network.weatherBuf);
+  int count = 1;
+  for (int p = all.indexOf(" ~ "); p >= 0; p = all.indexOf(" ~ ", p + 3)) count++;
+  if (next) _ssIdx++;
+  const int idx = _ssIdx % count;
+  int start = 0, e = 0;
+  for (int i = 0; i < idx; i++) start = all.indexOf(" ~ ", start) + 3;
+  e = all.indexOf(" ~ ", start);
+  _ssmemo->setText((e < 0 ? all.substring(start) : all.substring(start, e)).c_str());
+}
+
 void Display::_time(bool redraw) {
   
   #if LIGHT_SENSOR!=255
@@ -917,10 +952,11 @@ void Display::_time(bool redraw) {
       config.setBrightness();
     }
   #endif
-  if (config.isScreensaver && network.timeinfo.tm_sec % SCREENSAVERMOVE == 0) {
+  if (config.isScreensaver && (uint32_t)(millis() - _ssLastMove) >= (uint32_t)config.store.screensaverMove * 1000UL - 200UL) {
+    _ssLastMove = millis();
     int32_t clockH = _clock->clockHeight();
     int32_t minTop = max((int32_t)TFT_FRAMEWDT, (int32_t)_clock->timeHeight());
-    int32_t maxTop = dsp.height() - clockH - TFT_FRAMEWDT;
+    int32_t maxTop = dsp.height() - clockH - TFT_FRAMEWDT - _ssMemoBand();  // bande du bas reservee au pense-bete
     uint16_t ft = (maxTop > minTop) ? static_cast<uint16_t>(random(minTop, maxTop + 1)) : static_cast<uint16_t>(minTop);
 
     int32_t minLeft = TFT_FRAMEWDT;
@@ -931,6 +967,7 @@ void Display::_time(bool redraw) {
     uint16_t lt = static_cast<uint16_t>(left);
     //_clock->moveTo({clockConf_ptr->left, ft, 0});
     _clock->moveTo({lt, ft, 0});
+    _ssMemoUpdate(true);
   }
   if (redraw) _clock->forceDraw(); else _clock->draw();
 }
@@ -1026,6 +1063,7 @@ void Display::_reinitWidgets() {
       _weather = new ScrollWidget("~", *weatherConf_ptr, config.theme.weather, config.theme.background);
       pages[PG_PLAYER]->addWidget(_weather);
     } else _weather->init("~", *weatherConf_ptr, config.theme.weather, config.theme.background);
+    if (_ssmemo) _ssmemo->init("~", _ssMemoConf(), config.theme.weather, config.theme.background);
   }
   if (fullbitrateConf_ptr->dimension > 0) {
     if (!_fullbitrate) {

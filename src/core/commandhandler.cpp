@@ -215,6 +215,7 @@ bool CommandHandler::exec(const char *command, const char *value, uint8_t cid, C
   if (cmdIs(command, "screensaverplayingblank"))   { config.saveValue(&config.store.screensaverPlayingBlank, static_cast<bool>(atoi(value))); screensaverHelper(); return true; }
   if (cmdIs(command, "screensaverplayingtimeout")) { config.saveValue(&config.store.screensaverPlayingTimeout, static_cast<uint16_t>(constrain(atoi(value), 1, 1080))); screensaverHelper(); return true; }
   if (cmdIs(command, "screensaverfull"))           { config.saveValue(&config.store.screensaverFullDateTime, static_cast<bool>(atoi(value))); screensaverHelper(); return true; }
+  if (cmdIs(command, "screensavermove"))           { config.saveValue(&config.store.screensaverMove, static_cast<uint16_t>(constrain(atoi(value), 5, 600))); return true; }
   if (cmdIs(command, "dimmingenabled"))            { config.saveValue(&config.store.dimmingEnabled, static_cast<bool>(atoi(value))); backlightControls.restart(); return true; }
   if (cmdIs(command, "dimmingbrightness"))         {
     int dimbr=atoi(value);
