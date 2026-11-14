@@ -275,6 +275,15 @@ void handleReady(AsyncWebServerRequest *request) {
   request->send(response);
 }
 
+/* Reveil : GET /alarmscan = fichiers audio du dossier /reveil de la SD (JSON) */
+void handleAlarmScan(AsyncWebServerRequest *request) {
+  #if defined(ALARM_ENABLE) && defined(USE_SD)
+    request->send(200, "application/json", player.alarmScanJson());
+  #else
+    request->send(200, "application/json", "{\"err\":\"Carte SD non disponible\"}");
+  #endif
+}
+
 /* Pense-bete : GET /memo = liste + etat (JSON) ; POST /memo avec "csv" (liste complete) et/ou "show" (0/1) */
 void handleMemo(AsyncWebServerRequest *request) {
   if (request->method() == HTTP_POST) {
@@ -409,6 +418,7 @@ bool NetServer::begin(bool quiet) {
   });
   webserver.on("/search", HTTP_GET, handleSearch);
   webserver.on("/search", HTTP_POST, handleSearchPost);
+  webserver.on("/alarmscan", HTTP_GET, handleAlarmScan);
   webserver.on("/memo", HTTP_GET, handleMemo);
   webserver.on("/memo", HTTP_POST, handleMemo);
   webserver.on("/sdbackup", HTTP_GET, handleSdBackup);
@@ -740,7 +750,10 @@ void NetServer::processQueue() {
       case CURATED_FAILED: snprintf(wsbuf, sizeof(wsbuf), "{\"curated_failed\":true}"); break;
       case ARTWORK:       break;
       #ifdef ALARM_ENABLE
-        case ALARM:         snprintf(wsbuf, sizeof(wsbuf), "{\"alarmon\":%d,\"alarmh\":%d,\"alarmm\":%d,\"alarmdays\":%d,\"alarmsta\":%d,\"alarmvol\":%d,\"alarmvolmax\":%d}", config.store.alarmon ? 1 : 0, config.store.alarmhour, config.store.alarmmin, config.store.alarmdays, config.store.alarmstation, config.store.alarmvol, VOLUME_SCALE); break;
+        case ALARM: {
+          char trk[2 * 100 + 4];   // nom du fichier du reveil, echappe pour le JSON
+          { size_t k = 0; for (const char* c = config.store.alarmtrack; *c && k < sizeof(trk) - 3; c++) { if (*c == '"' || *c == '\\') trk[k++] = '\\'; if ((uint8_t)*c >= 0x20) trk[k++] = *c; } trk[k] = 0; }
+          snprintf(wsbuf, sizeof(wsbuf), "{\"alarmon\":%d,\"alarmh\":%d,\"alarmm\":%d,\"alarmdays\":%d,\"alarmsta\":%d,\"alarmvol\":%d,\"alarmfile\":%d,\"alarmtrack\":\"%s\",\"alarmvolmax\":%d}", config.store.alarmon ? 1 : 0, config.store.alarmhour, config.store.alarmmin, config.store.alarmdays, config.store.alarmstation, config.store.alarmvol, config.store.alarmfile ? 1 : 0, trk, VOLUME_SCALE); break; }
       #endif
       #ifdef SLIDESHOW_ENABLE
         case SLIDESHOW:     snprintf(wsbuf, sizeof(wsbuf), "{\"slideshow\":%u,\"slideshowrand\":%d}", (unsigned)slideshow.seconds(), slideshow.isRandom() ? 1 : 0); break;

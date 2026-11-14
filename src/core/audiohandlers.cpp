@@ -314,6 +314,9 @@ void AudioHandlers::handleId3Data(const char* info) {
 
 void AudioHandlers::handleEofMp3(const char* info) {
   (void)info;
+  #ifdef ALARM_ENABLE
+    if (player.alarmFileActive()) { player.alarmFileEof(); return; }   // reveil par MP3 : relance geree par Player::_alarmTick
+  #endif
   config.sdResumePos = 0;
   player.next();
 }

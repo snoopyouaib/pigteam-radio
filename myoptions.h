@@ -240,6 +240,13 @@
   #define VS1053_CS     255  /* 255 = VS1053 non utilise */
 #endif
 
+/* Fondus du volume (en millisecondes), communs a toutes les cartes :
+   - ALARM_RAMP_MS : montee progressive du volume a l'ouverture du reveil (30 s par defaut ;
+     60 s = 60000UL ; en dessous de ~15 s le son monte trop vite).
+   - SLEEP_FADE_MS : baisse progressive du volume avant l'arret programme (120 s par defaut). */
+#define ALARM_RAMP_MS 10000UL
+#define SLEEP_FADE_MS 120000UL
+
 /* Recherche Radio-Browser : tampon de telechargement 32 Ko (PSRAM). */
 #define SEARCHRESULTS_BUFFER 32
 /* Ne pas envoyer les "clics" d'ecoute a Radio-Browser (coupe les [RB Click] du log) */

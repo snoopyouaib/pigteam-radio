@@ -48,9 +48,13 @@
       <label><input type="checkbox" data-d="5">V</label><label><input type="checkbox" data-d="6">S</label>
       <label><input type="checkbox" data-d="0">D</label>
     </div>
-    <div class="row"><label>Station <select id="alarmstation"><option value="0">Dernière station écoutée</option></select></label></div>
+    <div class="row"><label><input type="checkbox" id="alarmfile"> Jouer un fichier audio du dossier <b>/reveil</b> (SD)</label>
+      <button class="sec" id="alarmscan">🔍 Scanner /reveil</button></div>
+    <div class="row"><label style="flex:1">Fichier <select id="alarmtrack" style="max-width:100%"><option value="-">🎲 Au hasard</option></select></label></div>
+    <div id="alarmscanres" class="hint"></div>
+    <div class="row" id="stationrow"><label>Station <select id="alarmstation"><option value="0">Dernière station écoutée</option></select></label></div>
     <div class="row"><label style="flex:1">Volume <input type="range" id="alarmvol" min="0" max="42" value="0"> <span id="alarmvolinfo">0</span></label></div>
-    <div class="hint">Le volume monte progressivement pendant 30 secondes.</div>
+    <div class="hint">Le volume monte progressivement pendant 30 secondes. Avec l'option SD, un fichier (mp3, m4a, aac, wav, flac, ogg, opus) du dossier <b>/reveil</b> est joué : celui que tu choisis dans la liste (après « Scanner »), sinon un fichier tiré au hasard, avec le suivant à la fin, jusqu'à l'arrêt. Un fichier choisi est rejoué en boucle. Ce dossier n'apparaît pas dans le lecteur SD, et le réveil ne joue rien d'autre. Sans carte ni fichier, la station choisie est jouée.</div>
   </div>
 
   <div class="card">
@@ -89,7 +93,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-let ws, retry = 0, slideOn = 0, sleepEnd = 0, A = {on:0,h:7,m:0,days:0x3E,sta:0,vol:0,volmax:42};
+let ws, retry = 0, slideOn = 0, sleepEnd = 0, A = {on:0,h:7,m:0,days:0x3E,sta:0,vol:0,file:0,track:'',volmax:42};
 const pad = n => String(n).padStart(2, '0');
 const send = s => { if (ws && ws.readyState === 1) ws.send(s); };
 
@@ -97,10 +101,22 @@ function renderAlarm() {
   $('alarmon').checked = !!A.on;
   $('alarmtime').value = pad(A.h) + ':' + pad(A.m);
   document.querySelectorAll('#days input').forEach(c => { c.checked = !!((A.days >> +c.dataset.d) & 1); });
+  setTrackOptions(null);
+  $('alarmfile').checked = !!A.file; $('stationrow').style.opacity = A.file ? '0.5' : '1';
   $('alarmvol').max = A.volmax; $('alarmvol').value = A.vol; $('alarmvolinfo').textContent = A.vol;
   const s = $('alarmstation');
   if (![...s.options].some(o => o.value === String(A.sta))) s.add(new Option('Station ' + A.sta, A.sta));
   s.value = String(A.sta);
+}
+/* liste deroulante des fichiers de /reveil : "au hasard" + fichiers scannes + fichier actuel s'il manque */
+function setTrackOptions(files) {
+  const s = $('alarmtrack');
+  const list = files || [...s.options].map(o => o.value).filter(v => v !== '-');
+  s.length = 1;
+  const names = list.slice();
+  if (A.track && !names.includes(A.track)) names.unshift(A.track);
+  names.forEach(f => s.add(new Option(f === A.track && !list.includes(f) ? f + ' (non scanné)' : f, f)));
+  s.value = A.track || '-';
 }
 function renderSleepLeft() {
   const left = Math.max(0, Math.round((sleepEnd - Date.now()) / 1000));
@@ -118,7 +134,7 @@ function renderSlide() {
   }
 }
 function onData(d) {
-  if (d.alarmon !== undefined) { A = {on:d.alarmon,h:d.alarmh,m:d.alarmm,days:d.alarmdays,sta:d.alarmsta,vol:d.alarmvol,volmax:d.alarmvolmax || A.volmax}; renderAlarm(); }
+  if (d.alarmon !== undefined) { A = {on:d.alarmon,h:d.alarmh,m:d.alarmm,days:d.alarmdays,sta:d.alarmsta,vol:d.alarmvol,file:d.alarmfile || 0,track:d.alarmtrack || '',volmax:d.alarmvolmax || A.volmax}; renderAlarm(); }
   if (d.slideshow !== undefined) { slideOn = +d.slideshow || 0; renderSlide(); }
   if (d.slideshowrand !== undefined) $('slidernd').checked = !!(+d.slideshowrand);
   if (d.sleeptimer !== undefined) {
@@ -146,6 +162,23 @@ async function loadStations() {
 $('alarmon').onchange = e => send('alarmon=' + (e.target.checked ? 1 : 0));
 $('alarmtime').onchange = e => { if (e.target.value) send('alarmtime=' + e.target.value); };
 $('alarmstation').onchange = e => send('alarmstation=' + e.target.value);
+$('alarmscan').onclick = async () => {
+  const out = $('alarmscanres'), b = $('alarmscan');
+  out.textContent = 'Scan en cours…'; b.disabled = true;
+  try {
+    const d = await (await fetch('/alarmscan')).json();
+    if (d.err) out.textContent = '⚠ ' + d.err;
+    else {
+      out.textContent = '';
+      setTrackOptions(d.files);
+      out.append(d.count + ' fichier' + (d.count > 1 ? 's' : '') + (d.count ? ' dans /reveil :' : ' dans /reveil : ajoute des fichiers sur la carte.'));
+      if (d.count) { const ul = document.createElement('ul'); ul.style.margin = '6px 0 0'; ul.style.paddingLeft = '20px'; d.files.forEach(f => { const li = document.createElement('li'); li.textContent = f; ul.append(li); }); out.append(ul); }
+    }
+  } catch (e) { out.textContent = '⚠ Scan impossible'; }
+  b.disabled = false;
+};
+$('alarmtrack').onchange = e => { A.track = e.target.value === '-' ? '' : e.target.value; send('alarmtrack=' + e.target.value); };
+$('alarmfile').onchange = e => send('alarmfile=' + (e.target.checked ? 1 : 0));
 $('alarmvol').oninput = e => { $('alarmvolinfo').textContent = e.target.value; };
 $('alarmvol').onchange = e => send('alarmvol=' + e.target.value);
 $('days').onchange = () => { let m = 0; document.querySelectorAll('#days input').forEach(c => { if (c.checked) m |= 1 << +c.dataset.d; }); send('alarmdays=' + m); };

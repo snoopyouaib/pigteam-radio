@@ -187,6 +187,8 @@ struct config_t // specify defaults here (and macros in options.h) (defaults are
   uint8_t   alarmmin = 0;
   uint8_t   alarmdays = 0x3E;    // bit n = jour n (0 = dimanche, 1 = lundi...) ; 0x3E = lundi a vendredi
   uint16_t  alarmstation = 0;    // 0 = derniere station ecoutee
+  char      alarmtrack[STATION_FIELD_LENGTH] = "";   // fichier choisi dans /reveil (chemin relatif) ; vide = au hasard
+  bool      alarmfile = false;   // reveil : un MP3 tire au hasard dans /reveil (SD) au lieu d'une station
   uint8_t   alarmvol = SOUND_VOLUME; // volume final du reveil (atteint en fin de montee progressive)
 
   // if adding a variable, you can do it anywhere, just be sure to add it to configKeyMap() in config.cpp

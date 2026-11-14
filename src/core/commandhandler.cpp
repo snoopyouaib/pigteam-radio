@@ -133,6 +133,13 @@ bool CommandHandler::exec(const char *command, const char *value, uint8_t cid, C
     }
     if (cmdIs(command, "alarmdays"))    { config.saveValue(&config.store.alarmdays, static_cast<uint8_t>(constrain(atoi(value), 0, 127))); netserver.requestOnChange(ALARM, 0); return true; }
     if (cmdIs(command, "alarmstation")) { config.saveValue(&config.store.alarmstation, static_cast<uint16_t>(constrain(atoi(value), 0, 65000))); netserver.requestOnChange(ALARM, 0); return true; }
+    if (cmdIs(command, "alarmfile"))    { config.saveValue(&config.store.alarmfile, static_cast<bool>(atoi(value))); netserver.requestOnChange(ALARM, 0); return true; }
+    if (cmdIs(command, "alarmtrack"))   {   // "-" ou vide = au hasard ; sinon chemin relatif a /reveil
+      if (strlen(value) > 100) return false;
+      config.saveValue(config.store.alarmtrack, (strcmp(value, "-") == 0) ? "" : value);
+      netserver.requestOnChange(ALARM, 0);
+      return true;
+    }
     if (cmdIs(command, "alarmvol"))     { config.saveValue(&config.store.alarmvol, static_cast<uint8_t>(constrain(atoi(value), 0, VOLUME_SCALE))); netserver.requestOnChange(ALARM, 0); return true; }
   #endif
   if (cmdIs(command, "mode"))            { cancelStreamRetry(); config.changeMode(atoi(value)); return true; }

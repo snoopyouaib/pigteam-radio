@@ -871,6 +871,8 @@ const configKeyMap Config::keyMap[] = {
   CONFIG_KEY_ENTRY(alarmdays, "alarmdays"),
   CONFIG_KEY_ENTRY(alarmstation, "alarmsta"),
   CONFIG_KEY_ENTRY(alarmvol, "alarmvol"),
+  CONFIG_KEY_ENTRY(alarmfile, "alarmfile"),
+  CONFIG_KEY_ENTRY(alarmtrack, "alarmtrk"),
   CONFIG_KEY_ENTRY(bootStableMarker, "bootstablemark"),
   CONFIG_KEY_ENTRY(SDoffline, "sdoffline"),
   {0, nullptr, 0} // Yup, 3 fields - don't delete the last line!

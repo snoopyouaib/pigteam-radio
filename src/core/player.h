@@ -23,9 +23,13 @@ enum plStatus_e : uint8_t{ PLAYING = 1, STOPPED = 2 };
 
 /* Arret programme (sleep timer) : volume en fondu puis arret. */
 #define SLEEP_TIMER_ENABLE
-#define SLEEP_FADE_MS 120000UL   // duree du fondu avant l'arret
+#ifndef SLEEP_FADE_MS
+  #define SLEEP_FADE_MS 120000UL   // duree du fondu avant l'arret (ms), reglable dans myoptions.h
+#endif
 #define ALARM_ENABLE            // reveil (heure, jours, station, volume progressif)
-#define ALARM_RAMP_MS 30000UL   // duree de la montee progressive du volume
+#ifndef ALARM_RAMP_MS
+  #define ALARM_RAMP_MS 30000UL   // duree de la montee progressive du volume du reveil (ms), reglable dans myoptions.h
+#endif
 
 class Player: public Audio {
   public:
@@ -68,6 +72,11 @@ class Player: public Audio {
     bool hasError() { return strlen(_plError)>0; }
     plStatus_e status() { return _status; }
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
+    #ifdef ALARM_ENABLE
+      bool alarmFileActive() { return _alarmFileMode; }                       // reveil en cours avec un MP3 de /reveil
+      String alarmScanJson();                                                  // liste des fichiers de /reveil (JSON) pour la page Outils
+      void alarmFileEof() { if (_alarmFileMode) _alarmFileNext = true; }      // fin du MP3 : on en relance un autre
+    #endif
   private:
     uint32_t    _resumeFilePos = 0;
     plStatus_e  _status = STOPPED;
@@ -90,6 +99,9 @@ class Player: public Audio {
       uint32_t _alarmRampStart = 0;
       uint32_t _alarmLastKey = 0;
       uint32_t _alarmLastCheck = 0;
+      bool     _alarmFileMode = false;
+      bool     _alarmFileNext = false;
+      bool _alarmPlayFile();
       void _alarmTick();
       void _alarmFire();
     #endif

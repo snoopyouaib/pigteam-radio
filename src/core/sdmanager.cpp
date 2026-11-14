@@ -65,6 +65,7 @@ bool SDManager::cardPresent() {
 }
 
 bool SDManager::_checkNoMedia(const char* path) {
+  if (strcasecmp(path, "/reveil") == 0) return true;   // dossier des MP3 du reveil : jamais indexe par le lecteur SD
   char nomedia[SD_PATH_LENGTH]= {0};
   strlcat(nomedia, path, SD_PATH_LENGTH);
   strlcat(nomedia, "/.nomedia", SD_PATH_LENGTH);

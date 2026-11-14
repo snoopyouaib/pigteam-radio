@@ -1,5 +1,7 @@
 #include "options.h"
 #include "player.h"
+#include <algorithm>
+#include <vector>
 #include "audiohandlers.h"
 #include "config.h"
 #include "logging.h"
@@ -111,6 +113,9 @@ void Player::_stop(bool alreadyStopped) {
   log_i("%s called", __func__);
   #ifdef ALARM_ENABLE
     _alarmRamp = false;
+    const bool wasAlarmFile = _alarmFileMode;
+    _alarmFileMode = false;
+    _alarmFileNext = false;
   #endif
   if (config.getMode()==PM_SDCARD && !alreadyStopped) config.sdResumePos = player.getFilePos();
   _status = STOPPED;
@@ -128,6 +133,9 @@ void Player::_stop(bool alreadyStopped) {
   if (!lockOutput) stopInfo();
   rgbled.stopped();
   backlightControls.restart();
+  #if defined(ALARM_ENABLE) && defined(USE_SD)
+    if (wasAlarmFile && config.getMode()==PM_WEB) sdman.stop();   // la SD n'est pas montee en mode radio web
+  #endif
 }
 
 void Player::initHeaders(const char *file) {
@@ -200,7 +208,7 @@ void Player::loop() {
     }
   }
   Audio::loop();
-  if (!isRunning() && _status==PLAYING) {
+  if (!isRunning() && _status==PLAYING && !_alarmFileMode) {
     // Stream died unexpectedly - trigger reconnection if WiFi is still up
     if (config.getMode() == PM_WEB && WiFi.status() == WL_CONNECTED && !network.lostPlaying) {
       FUNCTIONLOG("Player", "Stream stopped unexpectedly. Starting reconnection attempts...");
@@ -263,6 +271,10 @@ void Player::setOutputPins(bool isPlaying) {
 void Player::_play(uint16_t stationId) {
   log_i("%s called, stationId=%d", __func__, stationId);
   if (_status == PLAYING && stationId > 0 && stationId == _playingStationId) return;
+  #ifdef ALARM_ENABLE
+    _alarmFileMode = false;   // une autre lecture prend le relais du MP3 de reveil
+    _alarmFileNext = false;
+  #endif
   setError("");
   setDefaults();
   remoteStationName = false;
@@ -557,6 +569,12 @@ void Player::_alarmFire() {
   _alarmRampStart = millis();
   _alarmLastCheck = 0;
   _applyI2SVolume(0);
+  #ifdef USE_SD
+    if (config.store.alarmfile) {
+      if (_alarmPlayFile()) return;
+      FUNCTIONLOG("Alarm", "Aucun fichier audio utilisable dans /reveil : on joue la station");
+    }
+  #endif
   uint16_t id = config.store.alarmstation;
   if (id > utility.playlistLength()) id = 0; // station disparue de la liste : derniere station
   if (id > 0) {
@@ -566,8 +584,130 @@ void Player::_alarmFire() {
   }
 }
 
+#ifdef USE_SD
+/* Tirage au sort uniforme (sans tout garder en memoire) d'un fichier audio dans un dossier, sous-dossiers compris */
+static void alarmScanDir(const char* dirname, uint8_t levels, String& pick, uint32_t& n) {
+  File dir = sdman.open(dirname);
+  if (!dir || !dir.isDirectory()) { if (dir) dir.close(); return; }
+  for (;;) {
+    vTaskDelay(1);
+    bool isDir = false;
+    String f = dir.getNextFileName(&isDir);
+    if (f.isEmpty()) break;
+    String l = f;
+    l.toLowerCase();
+    const char* b = strrchr(l.c_str(), '/');
+    b = b ? b + 1 : l.c_str();
+    if (b[0] == '.') continue;                     // fichiers caches / ._ de macOS
+    if (isDir) {
+      if (levels && strcmp(b, "system volume information") != 0) alarmScanDir(f.c_str(), levels - 1, pick, n);
+      continue;
+    }
+    if (!(l.endsWith(".mp3") || l.endsWith(".m4a") || l.endsWith(".aac") || l.endsWith(".wav") || l.endsWith(".flac") || l.endsWith(".ogg") || l.endsWith(".opus"))) continue;
+    n++;
+    if (esp_random() % n == 0) pick = f;
+  }
+  dir.close();
+}
+
+static bool alarmListDir(const char* dirname, uint8_t levels, std::vector<String>& out, const char* prefix) {
+  File dir = sdman.open(dirname);
+  if (!dir || !dir.isDirectory()) { if (dir) dir.close(); return false; }
+  for (;;) {
+    vTaskDelay(1);
+    bool isDir = false;
+    String f = dir.getNextFileName(&isDir);
+    if (f.isEmpty()) break;
+    String l = f;
+    l.toLowerCase();
+    const char* b = strrchr(l.c_str(), '/');
+    b = b ? b + 1 : l.c_str();
+    if (b[0] == '.') continue;
+    if (isDir) { if (levels && out.size() < 200) alarmListDir(f.c_str(), levels - 1, out, prefix); continue; }
+    if (!(l.endsWith(".mp3") || l.endsWith(".m4a") || l.endsWith(".aac") || l.endsWith(".wav") || l.endsWith(".flac") || l.endsWith(".ogg") || l.endsWith(".opus"))) continue;
+    if (out.size() >= 200) break;
+    String rel = f;
+    if (rel.startsWith(prefix)) rel = rel.substring(strlen(prefix));
+    out.push_back(rel);
+  }
+  dir.close();
+  return true;
+}
+
+/* Page Outils, bouton « Scanner /reveil » : liste des fichiers audio du dossier (JSON). La SD est montee le temps du scan. */
+String Player::alarmScanJson() {
+  if (SD_CS == 255) return "{\"err\":\"Pas de carte SD configurée\"}";
+  if (_alarmFileMode || (config.getMode() == PM_SDCARD && isRunning())) return "{\"err\":\"Lecture en cours : arrête-la avant de scanner\"}";
+  const bool wasReady = sdman.ready;
+  if (!wasReady && !sdman.start()) { sdman.stop(); return "{\"err\":\"Carte SD absente ou illisible\"}"; }
+  std::vector<String> files;
+  const bool found = alarmListDir("/reveil", 2, files, "/reveil/");
+  if (!wasReady && config.getMode() == PM_WEB) sdman.stop();
+  if (!found) return "{\"err\":\"Dossier /reveil introuvable à la racine de la carte\"}";
+  std::sort(files.begin(), files.end(), [](const String& a, const String& b) { return strcasecmp(a.c_str(), b.c_str()) < 0; });
+  String o = "{\"count\":" + String((unsigned)files.size()) + ",\"files\":[";
+  for (size_t i = 0; i < files.size(); i++) {
+    String n = files[i];
+    n.replace("\\", "\\\\");
+    n.replace("\"", "\\\"");
+    if (i) o += ',';
+    o += '"'; o += n; o += '"';
+  }
+  o += "]}";
+  FUNCTIONLOG("Alarm", "Scan /reveil : %u fichiers", (unsigned)files.size());
+  return o;
+}
+
+/* Reveil par MP3 : tire un fichier audio dans /reveil de la carte SD (le lecteur SD n'indexe pas ce dossier,
+   voir sdmanager.cpp). La radio reste en mode web. */
+bool Player::_alarmPlayFile() {
+  if (SD_CS == 255) return false;
+  if (!sdman.ready && !sdman.start()) { sdman.stop(); return false; }
+  String pick;
+  uint32_t n = 0;
+  bool chosen = false;
+  if (config.store.alarmtrack[0]) {                       // fichier choisi depuis la page Outils
+    String t = String("/reveil/") + config.store.alarmtrack;
+    if (sdman.exists(t.c_str())) { pick = t; n = 1; chosen = true; }
+    else FUNCTIONLOG("Alarm", "Fichier choisi introuvable (%s) : tirage au hasard", config.store.alarmtrack);
+  }
+  if (!chosen) alarmScanDir("/reveil", 2, pick, n);
+  if (pick.isEmpty()) { if (config.getMode() == PM_WEB) sdman.stop(); return false; }
+  if (pick[0] != '/') pick = String("/") + pick;
+  FUNCTIONLOG("Alarm", "MP3 : %s (%u fichiers)", pick.c_str(), (unsigned)n);
+  if (!connecttoFS(sdman, pick.c_str())) {
+    FUNCTIONLOG("Alarm", "Lecture impossible : %s", pick.c_str());
+    if (config.getMode() == PM_WEB) sdman.stop();
+    return false;
+  }
+  const char* base = strrchr(pick.c_str(), '/');
+  base = base ? base + 1 : pick.c_str();
+  _alarmFileMode = true;
+  _alarmFileNext = false;
+  _status = PLAYING;
+  config.setStation("Reveil");
+  config.setTitle(base);
+  display.putRequest(NEWSTATION);
+  netserver.requestOnChange(STATION, 0);
+  setOutputPins(true);
+  netserver.requestOnChange(MODE, 0);
+  display.putRequest(NEWMODE, PLAYER);
+  display.putRequest(PSTART);
+  rgbled.playing();
+  backlightControls.restart();
+  return true;
+}
+#endif
+
 void Player::_alarmTick() {
   uint32_t now = millis();
+  #ifdef USE_SD
+    if (_alarmFileMode && _alarmFileNext) {   // fin d'un MP3 : on en tire un autre tant que le reveil n'est pas arrete
+      _alarmFileNext = false;
+      _alarmFileMode = false;
+      if (!_alarmPlayFile()) _stop(true);
+    }
+  #endif
   if (_alarmRamp) {
     if (now - _alarmLastCheck < 100) return;
     _alarmLastCheck = now;
